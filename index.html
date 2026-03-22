@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Révem — Relatório de Gestão</title>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Raleway',sans-serif;background:#F5F2EE;min-height:100vh;padding:2rem 1rem}
+:root{--carvao:#323430;--terracota:#A0522D;--salvia:#A7B195;--bege:#E7D7C7;--nevoa:#D1DFE8;--offwhite:#EEEBE5;--muted:#6B6860}
+.container{max-width:860px;margin:0 auto}
+
+/* TELA DE ENTRADA */
+.entrada{background:var(--carvao);border-radius:16px;padding:48px 40px;text-align:center;margin-top:4rem}
+.entrada-logo{font-family:Georgia,serif;font-size:32px;color:var(--offwhite);margin-bottom:6px}
+.entrada-sub{font-size:13px;color:var(--bege);opacity:.7;margin-bottom:2rem;font-style:italic}
+.entrada-label{font-size:12px;color:var(--bege);opacity:.8;margin-bottom:8px;text-align:left}
+.entrada-input{width:100%;padding:12px 16px;border-radius:8px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:var(--offwhite);font-family:'Raleway',sans-serif;font-size:14px;outline:none;transition:border .15s}
+.entrada-input:focus{border-color:var(--terracota)}
+.entrada-input::placeholder{color:rgba(255,255,255,.3)}
+.entrada-btn{margin-top:16px;width:100%;padding:13px;border-radius:8px;background:var(--terracota);border:none;color:#fff;font-family:'Raleway',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.entrada-btn:hover{opacity:.88}
+.entrada-erro{font-size:12px;color:#F09595;margin-top:10px}
+.entrada-dica{font-size:11px;color:rgba(255,255,255,.35);margin-top:12px;line-height:1.6}
+
+/* DASHBOARD */
+.topo{background:var(--carvao);border-radius:12px;padding:18px 24px;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.topo-esq .nome{font-family:Georgia,serif;font-size:20px;color:var(--offwhite)}
+.topo-esq .sub{font-size:12px;color:var(--bege);opacity:.8;margin-top:3px}
+.topo-dir{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.nav-meses{display:flex;gap:6px;flex-wrap:wrap}
+.nav-btn{font-size:11px;font-family:'Raleway',sans-serif;font-weight:600;padding:5px 10px;border-radius:20px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:var(--bege);cursor:pointer;transition:all .15s}
+.nav-btn:hover{background:rgba(255,255,255,.1)}
+.nav-btn.ativo{background:var(--terracota);border-color:var(--terracota);color:#fff}
+.trocar-btn{font-size:11px;color:rgba(255,255,255,.4);background:transparent;border:none;cursor:pointer;font-family:'Raleway',sans-serif;padding:4px 8px;border-radius:6px;transition:all .15s}
+.trocar-btn:hover{color:var(--bege);background:rgba(255,255,255,.08)}
+
+.insight-principal{background:var(--bege);border-left:3px solid var(--terracota);border-radius:0 8px 8px 0;padding:13px 18px;margin-bottom:1.5rem;font-size:13px;color:var(--carvao);line-height:1.7}
+.insight-principal strong{font-weight:600;color:var(--terracota)}
+.secao{font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin:1.5rem 0 .75rem}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:.5rem}
+.card{background:var(--offwhite);border-radius:10px;padding:13px 15px;border:.5px solid var(--bege)}
+.card-label{font-size:11px;color:var(--muted);margin-bottom:5px;line-height:1.4}
+.card-valor{font-family:Georgia,serif;font-size:22px;color:var(--carvao)}
+.card-delta{font-size:11px;margin-top:4px;font-weight:500}
+.up{color:#5C7A4E}.down{color:var(--terracota)}.neutral{color:var(--muted)}
+.bloco{background:var(--offwhite);border:.5px solid var(--bege);border-radius:10px;padding:15px 18px;margin-top:10px}
+.bloco-titulo{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.bloco-texto{font-size:13px;color:var(--carvao);line-height:1.7}
+.bloco-texto strong{font-weight:600}
+.alerta{background:#FDF3EC;border-radius:10px;padding:13px 18px;margin-top:10px;font-size:13px;color:#7A3A1A;line-height:1.7;border:.5px solid #E8C4A8}
+.alerta strong{font-weight:600}
+.row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:10px}
+.orig-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:.5px solid var(--bege)}
+.orig-item:last-child{border-bottom:none}
+.orig-label{font-size:13px;color:var(--carvao);flex:1}
+.bar-wrap{flex:2;height:5px;background:var(--bege);border-radius:3px;overflow:hidden}
+.bar{height:100%;border-radius:3px}
+.orig-pct{font-size:12px;color:var(--muted);min-width:30px;text-align:right}
+.conv{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600}
+.conv-a{background:#E8F0E4;color:#4A6B3C}
+.conv-m{background:#FDF3EC;color:#8B4A1E}
+.conv-b{background:#FCEAE8;color:#8B2A1E}
+.pacote-item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:.5px solid var(--bege);font-size:13px}
+.pacote-item:last-child{border-bottom:none}
+.pacote-dados{display:flex;gap:10px;align-items:center}
+.pacote-qtd{color:var(--muted);font-size:12px}
+.pacote-rec{font-weight:600;color:var(--carvao)}
+.ptag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600}
+.ptag-dest{background:var(--salvia);color:#2A3A2A}
+.ptag-ok{background:var(--nevoa);color:#2A3A4A}
+.acao-item{padding:11px 0;border-bottom:.5px solid var(--bege)}
+.acao-item:last-child{border-bottom:none}
+.acao-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.acao-tipo{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--carvao);color:var(--offwhite)}
+.acao-desc{font-size:13px;color:var(--carvao);font-weight:500}
+.acao-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.acao-campo{font-size:12px;color:var(--muted)}
+.acao-campo span{color:var(--carvao);display:block;margin-top:2px}
+.chart-wrap{position:relative;width:100%}
+.legenda{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:10px;font-size:12px;color:var(--muted)}
+.legenda-item{display:flex;align-items:center;gap:5px}
+.legenda-sq{width:10px;height:10px;border-radius:2px}
+.rodape{margin-top:2rem;padding-top:1rem;border-top:.5px solid var(--bege);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-family:Georgia,serif;font-style:italic}
+.rv-dot{width:6px;height:6px;border-radius:50%;background:var(--terracota);display:inline-block;margin-right:6px}
+.loading{text-align:center;padding:4rem 1rem;color:var(--muted);font-size:14px}
+.erro-msg{text-align:center;padding:3rem;color:var(--terracota);font-size:14px;background:var(--offwhite);border-radius:12px;margin-top:1rem}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- TELA DE ENTRADA -->
+  <div id="tela-entrada" class="entrada">
+    <div class="entrada-logo">Révem</div>
+    <div class="entrada-sub">Ateliê de Gestão — Relatório Mensal</div>
+    <div class="entrada-label">ID da planilha Google Sheets da cliente</div>
+    <input class="entrada-input" id="input-id" type="text" placeholder="Cole o ID aqui" />
+    <button class="entrada-btn" onclick="iniciar()">Carregar relatório</button>
+    <div class="entrada-erro" id="entrada-erro"></div>
+    <div class="entrada-dica">O ID está na URL da planilha:<br>docs.google.com/spreadsheets/d/<strong>ID_AQUI</strong>/edit</div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="tela-dashboard" style="display:none">
+    <div class="topo">
+      <div class="topo-esq">
+        <div class="nome" id="nome-cliente"></div>
+        <div class="sub" id="sub-cliente"></div>
+      </div>
+      <div class="topo-dir">
+        <div class="nav-meses" id="nav-meses"></div>
+        <button class="trocar-btn" onclick="trocarCliente()">↩ trocar</button>
+      </div>
+    </div>
+    <div id="conteudo"><div class="loading">Carregando dados...</div></div>
+  </div>
+
+</div>
+
+<script>
+const API_KEY = 'AIzaSyDhrFUETcO6E4tpeX0zoxV6Uzu7Fq_NK7Q';
+const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+let SHEET_ID = '';
+let dadosGlobais = {};
+let mesAtivo = null;
+let chartTend = null;
+let chartOrig = null;
+
+function gv(sheet, range) {
+  return fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheet+'!'+range)}?key=${API_KEY}`)
+    .then(r => { if(!r.ok) throw new Error('Erro '+r.status); return r.json(); })
+    .then(d => d.values || []);
+}
+
+function parseNum(v) {
+  if (!v) return 0;
+  const n = parseFloat(String(v).replace(/[R$\s.]/g,'').replace(',','.'));
+  return isNaN(n) ? 0 : n;
+}
+
+function fmt(v) { return 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
+function pct(v) { return (v*100).toFixed(1)+'%'; }
+function deltaTexto(a,b,tipo) {
+  if(b==null||b===0) return '';
+  const d=a-b;
+  if(tipo==='moeda') return (d>=0?'↑ ':'↓ ')+fmt(Math.abs(d))+' vs mês anterior';
+  if(tipo==='num') return (d>=0?'↑ ':'↓ ')+Math.abs(d)+' vs mês anterior';
+  if(tipo==='pct') return (d>=0?'↑ ':'↓ ')+Math.abs(d).toFixed(1)+'pp vs mês anterior';
+  return '';
+}
+function dc(a,b) { if(b==null) return 'neutral'; return a>b?'up':a<b?'down':'neutral'; }
+function convClass(r) { return r>=0.5?'conv-a':r>=0.2?'conv-m':'conv-b'; }
+function mesAnterior(mes) {
+  const i=MESES.indexOf(mes);
+  for(let j=i-1;j>=0;j--) if(dadosGlobais[MESES[j]]) return MESES[j];
+  return null;
+}
+
+function gerarInsight(d,dant) {
+  if(!dant) return 'Primeiro mês de dados registrados. Os próximos meses revelarão tendências.';
+  const conv=d.leads>0?d.fechados/d.leads:0;
+  const convAnt=dant.leads>0?dant.fechados/dant.leads:0;
+  const fatUp=d.faturamento>dant.faturamento;
+  const convUp=conv>convAnt;
+  const pFat=((d.faturamento/dant.faturamento-1)*100).toFixed(0);
+  if(fatUp&&!convUp) return `<strong>O que este mês nos diz:</strong> Faturamento cresceu ${pFat}% — mas a taxa de conversão caiu de ${pct(convAnt)} para ${pct(conv)}. Você está atraindo mais leads. O gargalo está na apresentação de proposta, não na captação.`;
+  if(fatUp&&convUp) return `<strong>O que este mês nos diz:</strong> Mês positivo em duas frentes — faturamento subiu ${pFat}% e a conversão melhorou de ${pct(convAnt)} para ${pct(conv)}. O sistema comercial está funcionando.`;
+  if(!fatUp&&convUp) return `<strong>O que este mês nos diz:</strong> Faturamento recuou vs mês anterior, mas a conversão melhorou para ${pct(conv)}. Você está fechando melhor — o volume de leads caiu. Foco em captação qualificada.`;
+  return `<strong>O que este mês nos diz:</strong> Mês mais conservador — faturamento e conversão abaixo do mês anterior. Vale revisar captação e processo de apresentação.`;
+}
+
+async function carregarMes(mes) {
+  const [cad,orig,fin,pac,pos,acoes] = await Promise.all([
+    gv(mes,'C18:C22'), gv(mes,'C26:D30'), gv(mes,'C33:C34'),
+    gv(mes,'B41:D45'), gv(mes,'C48:C51'), gv(mes,'C7:C15')
+  ]);
+  return {
+    leads:parseNum(cad[0]?.[0]), fechados:parseNum(cad[1]?.[0]),
+    ensaios:parseNum(cad[3]?.[0]), ativas:parseNum(cad[4]?.[0]),
+    origens:['Indicação','Instagram','Anúncio','Google','Outro'].map((nome,i)=>({
+      nome, leads:parseNum(orig[i]?.[0]), fechados:parseNum(orig[i]?.[1])
+    })),
+    faturamento:parseNum(fin[0]?.[0]), custos:parseNum(fin[1]?.[0]),
+    pacotes:pac.map(r=>({nome:r[0]||'',qtd:parseNum(r[1]),rec:parseNum(r[2])})).filter(p=>p.nome&&p.qtd>0),
+    depoimentos:parseNum(pos[0]?.[0]), indicacoes:parseNum(pos[1]?.[0]),
+    reativacoes:parseNum(pos[2]?.[0]), entregas:parseNum(pos[3]?.[0]),
+    acoes:[
+      {tipo:acoes[0]?.[0]||null,desc:acoes[1]?.[0]||null,impacto:acoes[2]?.[0]||null,resultado:acoes[3]?.[0]||null},
+      {tipo:acoes[5]?.[0]||null,desc:acoes[6]?.[0]||null,impacto:acoes[7]?.[0]||null,resultado:acoes[8]?.[0]||null}
+    ]
+  };
+}
+
+function renderizar(mes) {
+  const d=dadosGlobais[mes];
+  const antMes=mesAnterior(mes);
+  const dant=antMes?dadosGlobais[antMes]:null;
+  const conv=d.leads>0?d.fechados/d.leads:0;
+  const convAnt=dant&&dant.leads>0?dant.fechados/dant.leads:null;
+  const lucro=d.faturamento-d.custos;
+  const margem=d.faturamento>0?lucro/d.faturamento:0;
+  const ticket=d.fechados>0?d.faturamento/d.fechados:0;
+  const ticketAnt=dant&&dant.fechados>0?dant.faturamento/dant.fechados:null;
+  const origemTop=[...d.origens].filter(o=>o.leads>0).sort((a,b)=>(b.fechados/b.leads)-(a.fechados/a.leads))[0];
+  const origSemConv=d.origens.find(o=>o.leads>0&&o.fechados===0);
+  const mesesComDados=MESES.filter(m=>dadosGlobais[m]);
+  const idxAtual=mesesComDados.indexOf(mes);
+  const mesesVis=mesesComDados.slice(Math.max(0,idxAtual-2),idxAtual+1);
+
+  document.getElementById('conteudo').innerHTML = `
+  <div class="insight-principal">${gerarInsight(d,dant)}</div>
+
+  ${d.acoes.some(a=>a.tipo)?`
+  <div class="secao">Ações do mês</div>
+  <div class="bloco" style="margin-top:0"><div class="bloco-titulo">O que foi feito em ${mes}</div>
+  ${d.acoes.filter(a=>a.tipo).map(a=>`
+  <div class="acao-item"><div class="acao-top"><div class="acao-tipo">${a.tipo}</div><div class="acao-desc">${a.desc}</div></div>
+  <div class="acao-grid"><div class="acao-campo">Impacto esperado<span>${a.impacto}</span></div><div class="acao-campo">Resultado observado<span>${a.resultado}</span></div></div></div>`).join('')}
+  </div>`:''}
+
+  <div class="secao">Tendência — faturamento e lucro</div>
+  <div class="bloco" style="margin-top:0">
+    <div class="legenda"><div class="legenda-item"><div class="legenda-sq" style="background:#A0522D"></div>Faturamento bruto</div><div class="legenda-item"><div class="legenda-sq" style="background:#A7B195"></div>Lucro real</div></div>
+    <div class="chart-wrap" style="height:200px"><canvas id="chartTend"></canvas></div>
+  </div>
+
+  <div class="secao">Comercial</div>
+  <div class="cards">
+    <div class="card"><div class="card-label">Leads recebidos</div><div class="card-valor">${d.leads}</div><div class="card-delta ${dant?dc(d.leads,dant.leads):''}">${dant?deltaTexto(d.leads,dant.leads,'num'):''}</div></div>
+    <div class="card"><div class="card-label">Leads convertidos</div><div class="card-valor">${d.fechados}</div><div class="card-delta ${dant?dc(d.fechados,dant.fechados):''}">${dant?deltaTexto(d.fechados,dant.fechados,'num'):''}</div></div>
+    <div class="card"><div class="card-label">Taxa de conversão</div><div class="card-valor">${pct(conv)}</div><div class="card-delta ${convAnt!=null?dc(conv,convAnt):''}">${convAnt!=null?deltaTexto(conv*100,convAnt*100,'pct'):''}</div></div>
+    <div class="card"><div class="card-label">Ensaios realizados</div><div class="card-valor">${d.ensaios}</div><div class="card-delta neutral"></div></div>
+  </div>
+  ${conv<0.35&&d.leads>0?`<div class="alerta"><strong>Ponto de atenção:</strong> Taxa de conversão em ${pct(conv)}. Vale revisitar os scripts de apresentação de proposta.</div>`:''}
+
+  <div class="secao">Origem dos leads</div>
+  <div class="row2">
+    <div class="bloco" style="margin-top:0"><div class="bloco-titulo">Volume e conversão por canal</div>
+    ${d.origens.filter(o=>o.leads>0).map(o=>{
+      const r=o.leads>0?o.fechados/o.leads:0;
+      const pL=Math.round(o.leads/d.leads*100);
+      const cor=o.nome==='Indicação'?'#A0522D':o.nome==='Instagram'?'#A7B195':o.nome==='Google'?'#D1DFE8':'#E7D7C7';
+      return `<div class="orig-item"><div class="orig-label">${o.nome}</div><div class="bar-wrap"><div class="bar" style="width:${pL}%;background:${cor}"></div></div><div class="orig-pct">${pL}%</div><div class="conv ${convClass(r)}">${pct(r)} conv.</div></div>`;
+    }).join('')}</div>
+    <div class="bloco" style="margin-top:0"><div class="bloco-titulo">Distribuição visual</div><div class="chart-wrap" style="height:160px"><canvas id="chartOrig"></canvas></div></div>
+  </div>
+  <div class="bloco"><div class="bloco-titulo">O que isso revela</div><div class="bloco-texto">
+    ${origemTop?`<strong>${origemTop.nome}</strong> é seu canal de maior conversão (${pct(origemTop.leads>0?origemTop.fechados/origemTop.leads:0)}).`:''}
+    ${origSemConv?` <strong>${origSemConv.nome} não converteu nenhum lead este mês</strong> — vale revisar o investimento nesse canal.`:''}
+  </div></div>
+
+  <div class="secao">Visão financeira</div>
+  <div class="cards">
+    <div class="card"><div class="card-label">Faturamento bruto</div><div class="card-valor" style="font-size:18px">${fmt(d.faturamento)}</div><div class="card-delta ${dant?dc(d.faturamento,dant.faturamento):''}">${dant?deltaTexto(d.faturamento,dant.faturamento,'moeda'):''}</div></div>
+    <div class="card"><div class="card-label">Custos do mês</div><div class="card-valor" style="font-size:18px">${fmt(d.custos)}</div><div class="card-delta neutral">${d.faturamento>0?pct(d.custos/d.faturamento)+' do fat.':''}</div></div>
+    <div class="card"><div class="card-label">Lucro real</div><div class="card-valor" style="font-size:18px">${fmt(lucro)}</div><div class="card-delta up">Margem ${pct(margem)}</div></div>
+    <div class="card"><div class="card-label">Ticket médio</div><div class="card-valor" style="font-size:18px">${fmt(Math.round(ticket))}</div><div class="card-delta ${ticketAnt?dc(ticket,ticketAnt):''}">${ticketAnt?deltaTexto(ticket,ticketAnt,'moeda'):''}</div></div>
+  </div>
+  <div class="bloco"><div class="bloco-titulo">O que isso significa</div><div class="bloco-texto">
+    ${margem>=0.65?`Margem de ${pct(margem)} <strong>acima da média do nicho (65%)</strong>.`:`Margem de ${pct(margem)} abaixo da média do nicho (65%). Vale revisar os custos.`}
+    ${d.pacotes[0]?` ${d.pacotes[0].nome} representa ${Math.round(d.pacotes[0].rec/d.faturamento*100)}% do faturamento este mês.`:''}
+  </div></div>
+
+  ${d.pacotes.length>0?`
+  <div class="secao">Pacotes e serviços</div>
+  <div class="bloco" style="margin-top:0"><div class="bloco-titulo">O que você mais vendeu — e o que mais rendeu</div>
+  ${d.pacotes.sort((a,b)=>b.rec-a.rec).map((p,i)=>`
+  <div class="pacote-item"><div class="pacote-nome">${p.nome}</div>
+  <div class="pacote-dados"><div class="pacote-qtd">${p.qtd} ensaio${p.qtd>1?'s':''}</div><div class="pacote-rec">${fmt(p.rec)}</div><div class="ptag ${i===0?'ptag-dest':'ptag-ok'}">${i===0?'mais rentável':'ok'}</div></div></div>`).join('')}
+  </div>`:''}
+
+  <div class="secao">Pós-venda e relacionamento</div>
+  <div class="cards">
+    <div class="card"><div class="card-label">Depoimentos coletados</div><div class="card-valor">${d.depoimentos}</div><div class="card-delta ${d.entregas>0&&d.depoimentos/d.entregas<0.5?'down':'neutral'}">${d.entregas>0?pct(d.depoimentos/d.entregas)+' das entregas':''}</div></div>
+    <div class="card"><div class="card-label">Indicações recebidas</div><div class="card-valor">${d.indicacoes}</div><div class="card-delta ${dant?dc(d.indicacoes,dant.indicacoes):''}">${dant?deltaTexto(d.indicacoes,dant.indicacoes,'num'):''}</div></div>
+    <div class="card"><div class="card-label">Reativações</div><div class="card-valor">${d.reativacoes}</div><div class="card-delta neutral"></div></div>
+    <div class="card"><div class="card-label">Entregas realizadas</div><div class="card-valor">${d.entregas}</div><div class="card-delta neutral"></div></div>
+  </div>
+  ${d.entregas>0&&d.depoimentos/d.entregas<0.5?`<div class="alerta"><strong>Ponto de atenção:</strong> Depoimento coletado de apenas ${pct(d.depoimentos/d.entregas)} das entregas. A régua de pós-venda precisa de ajuste no timing do pedido.</div>`:''}
+
+  <div class="rodape">
+    <span><span class="rv-dot"></span>Révem Ateliê de Gestão</span>
+    <span>${mes} · Relatório Mensal · Confidencial</span>
+  </div>`;
+
+  if(chartTend){chartTend.destroy();chartTend=null;}
+  if(chartOrig){chartOrig.destroy();chartOrig=null;}
+
+  const ctxT=document.getElementById('chartTend');
+  if(ctxT) chartTend=new Chart(ctxT,{type:'bar',data:{labels:mesesVis,datasets:[
+    {label:'Faturamento',data:mesesVis.map(m=>dadosGlobais[m].faturamento),backgroundColor:'#A0522D',borderRadius:6,barPercentage:.5,categoryPercentage:.6},
+    {label:'Lucro',data:mesesVis.map(m=>dadosGlobais[m].faturamento-dadosGlobais[m].custos),backgroundColor:'#A7B195',borderRadius:6,barPercentage:.5,categoryPercentage:.6}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' R$ '+c.raw.toLocaleString('pt-BR')}}},scales:{x:{grid:{display:false},ticks:{color:'#6B6860',font:{size:12}}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{color:'#6B6860',font:{size:11},callback:v=>'R$ '+(v/1000).toFixed(0)+'k'}}}}});
+
+  const ctxO=document.getElementById('chartOrig');
+  if(ctxO){const of=d.origens.filter(o=>o.leads>0);chartOrig=new Chart(ctxO,{type:'doughnut',data:{labels:of.map(o=>o.nome),datasets:[{data:of.map(o=>o.leads),backgroundColor:['#A0522D','#A7B195','#E7D7C7','#D1DFE8','#888780'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw} leads`}}}}});}
+}
+
+function renderizarNav() {
+  const mesesComDados=MESES.filter(m=>dadosGlobais[m]);
+  document.getElementById('nav-meses').innerHTML=mesesComDados.map(m=>
+    `<button class="nav-btn ${m===mesAtivo?'ativo':''}" onclick="selecionarMes('${m}')">${m}</button>`
+  ).join('');
+}
+
+function selecionarMes(mes){mesAtivo=mes;renderizarNav();renderizar(mes);}
+
+function trocarCliente(){
+  dadosGlobais={};mesAtivo=null;SHEET_ID='';
+  document.getElementById('tela-dashboard').style.display='none';
+  document.getElementById('tela-entrada').style.display='block';
+  document.getElementById('input-id').value='';
+  document.getElementById('entrada-erro').textContent='';
+}
+
+async function iniciar(){
+  const id=document.getElementById('input-id').value.trim();
+  if(!id){document.getElementById('entrada-erro').textContent='Cole o ID da planilha antes de continuar.';return;}
+  SHEET_ID=id;
+  document.getElementById('entrada-erro').textContent='';
+  document.getElementById('tela-entrada').style.display='none';
+  document.getElementById('tela-dashboard').style.display='block';
+  document.getElementById('conteudo').innerHTML='<div class="loading">Carregando dados da planilha...</div>';
+
+  try {
+    const cadR=await gv('Cadastro','C5:C7');
+    document.getElementById('nome-cliente').textContent=cadR[0]?.[0]||'Cliente';
+    document.getElementById('sub-cliente').textContent=cadR[1]?.[0]||'';
+
+    const checks=await Promise.all(MESES.map(m=>
+      gv(m,'C18').then(r=>parseNum(r[0]?.[0])>0).catch(()=>false)
+    ));
+    const mesesAtivos=MESES.filter((_,i)=>checks[i]);
+
+    if(mesesAtivos.length===0){
+      document.getElementById('conteudo').innerHTML='<div class="erro-msg">Nenhum dado encontrado. Preencha pelo menos um mês na planilha e tente novamente.</div>';
+      return;
+    }
+
+    await Promise.all(mesesAtivos.map(async m=>{dadosGlobais[m]=await carregarMes(m);}));
+    mesAtivo=mesesAtivos[mesesAtivos.length-1];
+    renderizarNav();
+    renderizar(mesAtivo);
+  } catch(e){
+    document.getElementById('conteudo').innerHTML=`<div class="erro-msg">Erro ao carregar. Verifique se a planilha está pública e o ID está correto.<br><small>${e.message}</small></div>`;
+  }
+}
+
+document.getElementById('input-id').addEventListener('keydown',e=>{if(e.key==='Enter')iniciar();});
+</script>
+</body>
+</html>
