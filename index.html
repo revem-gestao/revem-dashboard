@@ -8,45 +8,47 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Raleway',sans-serif;background:#F5F2EE;min-height:100vh;padding:2rem 1rem}
-:root{--carvao:#323430;--terracota:#A0522D;--salvia:#A7B195;--bege:#E7D7C7;--nevoa:#D1DFE8;--offwhite:#EEEBE5;--muted:#6B6860}
+body{font-family:'Raleway',sans-serif;background:#EEEBE5;min-height:100vh;padding:2rem 1rem}
+:root{--carvao:#323430;--terracota:#A0522D;--salvia:#A7B195;--bege:#E7D7C7;--nevoa:#D1DFE8;--offwhite:#EEEBE5;--branco:#FDFBF8;--muted:#6B6860}
 .container{max-width:860px;margin:0 auto}
 
 /* TELA DE ENTRADA */
-.entrada{background:var(--carvao);border-radius:16px;padding:48px 40px;text-align:center;margin-top:4rem}
-.entrada-logo{font-family:Georgia,serif;font-size:32px;color:var(--offwhite);margin-bottom:6px}
-.entrada-sub{font-size:13px;color:var(--bege);opacity:.7;margin-bottom:2rem;font-style:italic}
-.entrada-label{font-size:12px;color:var(--bege);opacity:.8;margin-bottom:8px;text-align:left}
-.entrada-input{width:100%;padding:12px 16px;border-radius:8px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:var(--offwhite);font-family:'Raleway',sans-serif;font-size:14px;outline:none;transition:border .15s}
+.entrada{background:var(--branco);border-radius:16px;padding:48px 40px;text-align:center;margin-top:4rem;border:.5px solid var(--bege)}
+.entrada-logo{font-family:Georgia,serif;font-size:36px;color:var(--carvao);margin-bottom:4px}
+.entrada-tagline{font-size:12px;color:var(--terracota);margin-bottom:2rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.entrada-label{font-size:12px;color:var(--muted);margin-bottom:8px;text-align:left}
+.entrada-input{width:100%;padding:12px 16px;border-radius:8px;border:1.5px solid var(--bege);background:var(--offwhite);color:var(--carvao);font-family:'Raleway',sans-serif;font-size:14px;outline:none;transition:border .15s}
 .entrada-input:focus{border-color:var(--terracota)}
-.entrada-input::placeholder{color:rgba(255,255,255,.3)}
-.entrada-btn{margin-top:16px;width:100%;padding:13px;border-radius:8px;background:var(--terracota);border:none;color:#fff;font-family:'Raleway',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s}
-.entrada-btn:hover{opacity:.88}
-.entrada-erro{font-size:12px;color:#F09595;margin-top:10px}
-.entrada-dica{font-size:11px;color:rgba(255,255,255,.35);margin-top:12px;line-height:1.6}
+.entrada-input::placeholder{color:#BBBBBB}
+.entrada-btn{margin-top:14px;width:100%;padding:13px;border-radius:8px;background:var(--carvao);border:none;color:#fff;font-family:'Raleway',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.entrada-btn:hover{opacity:.85}
+.entrada-erro{font-size:12px;color:var(--terracota);margin-top:10px}
+.entrada-dica{font-size:11px;color:#BBBBBB;margin-top:14px;line-height:1.7}
 
-/* DASHBOARD */
-.topo{background:var(--carvao);border-radius:12px;padding:18px 24px;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
-.topo-esq .nome{font-family:Georgia,serif;font-size:20px;color:var(--offwhite)}
-.topo-esq .sub{font-size:12px;color:var(--bege);opacity:.8;margin-top:3px}
+/* TOPO DO DASHBOARD */
+.topo{background:var(--branco);border-radius:12px;padding:18px 24px;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border:.5px solid var(--bege)}
+.topo-esq .nome{font-family:Georgia,serif;font-size:20px;color:var(--carvao)}
+.topo-esq .sub{font-size:12px;color:var(--muted);margin-top:3px}
+.topo-esq .revem-label{font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--terracota);text-transform:uppercase;margin-bottom:4px}
 .topo-dir{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .nav-meses{display:flex;gap:6px;flex-wrap:wrap}
-.nav-btn{font-size:11px;font-family:'Raleway',sans-serif;font-weight:600;padding:5px 10px;border-radius:20px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:var(--bege);cursor:pointer;transition:all .15s}
-.nav-btn:hover{background:rgba(255,255,255,.1)}
-.nav-btn.ativo{background:var(--terracota);border-color:var(--terracota);color:#fff}
-.trocar-btn{font-size:11px;color:rgba(255,255,255,.4);background:transparent;border:none;cursor:pointer;font-family:'Raleway',sans-serif;padding:4px 8px;border-radius:6px;transition:all .15s}
-.trocar-btn:hover{color:var(--bege);background:rgba(255,255,255,.08)}
+.nav-btn{font-size:11px;font-family:'Raleway',sans-serif;font-weight:600;padding:5px 10px;border-radius:20px;border:1.5px solid var(--bege);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s}
+.nav-btn:hover{background:var(--offwhite);border-color:var(--carvao);color:var(--carvao)}
+.nav-btn.ativo{background:var(--carvao);border-color:var(--carvao);color:#fff}
+.trocar-btn{font-size:11px;color:var(--muted);background:transparent;border:none;cursor:pointer;font-family:'Raleway',sans-serif;padding:4px 8px;border-radius:6px;transition:all .15s}
+.trocar-btn:hover{color:var(--carvao);background:var(--offwhite)}
 
-.insight-principal{background:var(--bege);border-left:3px solid var(--terracota);border-radius:0 8px 8px 0;padding:13px 18px;margin-bottom:1.5rem;font-size:13px;color:var(--carvao);line-height:1.7}
+/* CONTEÚDO */
+.insight-principal{background:var(--branco);border-left:3px solid var(--terracota);border-radius:0 8px 8px 0;padding:14px 18px;margin-bottom:1.5rem;font-size:13px;color:var(--carvao);line-height:1.7;border-top:.5px solid var(--bege);border-right:.5px solid var(--bege);border-bottom:.5px solid var(--bege)}
 .insight-principal strong{font-weight:600;color:var(--terracota)}
 .secao{font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin:1.5rem 0 .75rem}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:.5rem}
-.card{background:var(--offwhite);border-radius:10px;padding:13px 15px;border:.5px solid var(--bege)}
+.card{background:var(--branco);border-radius:10px;padding:13px 15px;border:.5px solid var(--bege)}
 .card-label{font-size:11px;color:var(--muted);margin-bottom:5px;line-height:1.4}
 .card-valor{font-family:Georgia,serif;font-size:22px;color:var(--carvao)}
 .card-delta{font-size:11px;margin-top:4px;font-weight:500}
 .up{color:#5C7A4E}.down{color:var(--terracota)}.neutral{color:var(--muted)}
-.bloco{background:var(--offwhite);border:.5px solid var(--bege);border-radius:10px;padding:15px 18px;margin-top:10px}
+.bloco{background:var(--branco);border:.5px solid var(--bege);border-radius:10px;padding:15px 18px;margin-top:10px}
 .bloco-titulo{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
 .bloco-texto{font-size:13px;color:var(--carvao);line-height:1.7}
 .bloco-texto strong{font-weight:600}
@@ -74,7 +76,7 @@ body{font-family:'Raleway',sans-serif;background:#F5F2EE;min-height:100vh;paddin
 .acao-item{padding:11px 0;border-bottom:.5px solid var(--bege)}
 .acao-item:last-child{border-bottom:none}
 .acao-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.acao-tipo{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--carvao);color:var(--offwhite)}
+.acao-tipo{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--carvao);color:#fff}
 .acao-desc{font-size:13px;color:var(--carvao);font-weight:500}
 .acao-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
 .acao-campo{font-size:12px;color:var(--muted)}
@@ -86,16 +88,15 @@ body{font-family:'Raleway',sans-serif;background:#F5F2EE;min-height:100vh;paddin
 .rodape{margin-top:2rem;padding-top:1rem;border-top:.5px solid var(--bege);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-family:Georgia,serif;font-style:italic}
 .rv-dot{width:6px;height:6px;border-radius:50%;background:var(--terracota);display:inline-block;margin-right:6px}
 .loading{text-align:center;padding:4rem 1rem;color:var(--muted);font-size:14px}
-.erro-msg{text-align:center;padding:3rem;color:var(--terracota);font-size:14px;background:var(--offwhite);border-radius:12px;margin-top:1rem}
+.erro-msg{text-align:center;padding:3rem;color:var(--terracota);font-size:14px;background:var(--branco);border-radius:12px;margin-top:1rem;border:.5px solid var(--bege)}
 </style>
 </head>
 <body>
 <div class="container">
 
-  <!-- TELA DE ENTRADA -->
   <div id="tela-entrada" class="entrada">
     <div class="entrada-logo">Révem</div>
-    <div class="entrada-sub">Ateliê de Gestão — Relatório Mensal</div>
+    <div class="entrada-tagline">Ateliê de Gestão — Relatório Mensal</div>
     <div class="entrada-label">ID da planilha Google Sheets da cliente</div>
     <input class="entrada-input" id="input-id" type="text" placeholder="Cole o ID aqui" />
     <button class="entrada-btn" onclick="iniciar()">Carregar relatório</button>
@@ -103,10 +104,10 @@ body{font-family:'Raleway',sans-serif;background:#F5F2EE;min-height:100vh;paddin
     <div class="entrada-dica">O ID está na URL da planilha:<br>docs.google.com/spreadsheets/d/<strong>ID_AQUI</strong>/edit</div>
   </div>
 
-  <!-- DASHBOARD -->
   <div id="tela-dashboard" style="display:none">
     <div class="topo">
       <div class="topo-esq">
+        <div class="revem-label">Révem — Relatório Mensal</div>
         <div class="nome" id="nome-cliente"></div>
         <div class="sub" id="sub-cliente"></div>
       </div>
@@ -135,13 +136,11 @@ function gv(sheet, range) {
     .then(r => { if(!r.ok) throw new Error('Erro '+r.status); return r.json(); })
     .then(d => d.values || []);
 }
-
 function parseNum(v) {
   if (!v) return 0;
   const n = parseFloat(String(v).replace(/[R$\s.]/g,'').replace(',','.'));
   return isNaN(n) ? 0 : n;
 }
-
 function fmt(v) { return 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
 function pct(v) { return (v*100).toFixed(1)+'%'; }
 function deltaTexto(a,b,tipo) {
@@ -159,7 +158,6 @@ function mesAnterior(mes) {
   for(let j=i-1;j>=0;j--) if(dadosGlobais[MESES[j]]) return MESES[j];
   return null;
 }
-
 function gerarInsight(d,dant) {
   if(!dant) return 'Primeiro mês de dados registrados. Os próximos meses revelarão tendências.';
   const conv=d.leads>0?d.fechados/d.leads:0;
@@ -172,7 +170,6 @@ function gerarInsight(d,dant) {
   if(!fatUp&&convUp) return `<strong>O que este mês nos diz:</strong> Faturamento recuou vs mês anterior, mas a conversão melhorou para ${pct(conv)}. Você está fechando melhor — o volume de leads caiu. Foco em captação qualificada.`;
   return `<strong>O que este mês nos diz:</strong> Mês mais conservador — faturamento e conversão abaixo do mês anterior. Vale revisar captação e processo de apresentação.`;
 }
-
 async function carregarMes(mes) {
   const [cad,orig,fin,pac,pos,acoes] = await Promise.all([
     gv(mes,'C18:C22'), gv(mes,'C26:D30'), gv(mes,'C33:C34'),
@@ -194,7 +191,6 @@ async function carregarMes(mes) {
     ]
   };
 }
-
 function renderizar(mes) {
   const d=dadosGlobais[mes];
   const antMes=mesAnterior(mes);
@@ -269,7 +265,7 @@ function renderizar(mes) {
   <div class="secao">Pacotes e serviços</div>
   <div class="bloco" style="margin-top:0"><div class="bloco-titulo">O que você mais vendeu — e o que mais rendeu</div>
   ${d.pacotes.sort((a,b)=>b.rec-a.rec).map((p,i)=>`
-  <div class="pacote-item"><div class="pacote-nome">${p.nome}</div>
+  <div class="pacote-item"><div>${p.nome}</div>
   <div class="pacote-dados"><div class="pacote-qtd">${p.qtd} ensaio${p.qtd>1?'s':''}</div><div class="pacote-rec">${fmt(p.rec)}</div><div class="ptag ${i===0?'ptag-dest':'ptag-ok'}">${i===0?'mais rentável':'ok'}</div></div></div>`).join('')}
   </div>`:''}
 
@@ -306,9 +302,7 @@ function renderizarNav() {
     `<button class="nav-btn ${m===mesAtivo?'ativo':''}" onclick="selecionarMes('${m}')">${m}</button>`
   ).join('');
 }
-
 function selecionarMes(mes){mesAtivo=mes;renderizarNav();renderizar(mes);}
-
 function trocarCliente(){
   dadosGlobais={};mesAtivo=null;SHEET_ID='';
   document.getElementById('tela-dashboard').style.display='none';
@@ -316,7 +310,6 @@ function trocarCliente(){
   document.getElementById('input-id').value='';
   document.getElementById('entrada-erro').textContent='';
 }
-
 async function iniciar(){
   const id=document.getElementById('input-id').value.trim();
   if(!id){document.getElementById('entrada-erro').textContent='Cole o ID da planilha antes de continuar.';return;}
@@ -325,22 +318,16 @@ async function iniciar(){
   document.getElementById('tela-entrada').style.display='none';
   document.getElementById('tela-dashboard').style.display='block';
   document.getElementById('conteudo').innerHTML='<div class="loading">Carregando dados da planilha...</div>';
-
   try {
     const cadR=await gv('Cadastro','C5:C7');
     document.getElementById('nome-cliente').textContent=cadR[0]?.[0]||'Cliente';
     document.getElementById('sub-cliente').textContent=cadR[1]?.[0]||'';
-
-    const checks=await Promise.all(MESES.map(m=>
-      gv(m,'C18').then(r=>parseNum(r[0]?.[0])>0).catch(()=>false)
-    ));
+    const checks=await Promise.all(MESES.map(m=>gv(m,'C18').then(r=>parseNum(r[0]?.[0])>0).catch(()=>false)));
     const mesesAtivos=MESES.filter((_,i)=>checks[i]);
-
     if(mesesAtivos.length===0){
       document.getElementById('conteudo').innerHTML='<div class="erro-msg">Nenhum dado encontrado. Preencha pelo menos um mês na planilha e tente novamente.</div>';
       return;
     }
-
     await Promise.all(mesesAtivos.map(async m=>{dadosGlobais[m]=await carregarMes(m);}));
     mesAtivo=mesesAtivos[mesesAtivos.length-1];
     renderizarNav();
@@ -349,7 +336,6 @@ async function iniciar(){
     document.getElementById('conteudo').innerHTML=`<div class="erro-msg">Erro ao carregar. Verifique se a planilha está pública e o ID está correto.<br><small>${e.message}</small></div>`;
   }
 }
-
 document.getElementById('input-id').addEventListener('keydown',e=>{if(e.key==='Enter')iniciar();});
 </script>
 </body>
