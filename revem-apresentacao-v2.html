@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Révem — O Bastidor do Seu Negócio</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --carvao: #2C2C2C;
+    --terracota: #A0522D;
+    --terracota-light: #C4744A;
+    --salvia: #7A8C6E;
+    --bege: #D4C4A8;
+    --offwhite: #F5F0E8;
+    --offwhite-dark: #EDE6D8;
+    --offwhite-mid: #E8E0D0;
+    --text: #3A3530;
+    --text-light: #6B6259;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--offwhite);
+    color: var(--text);
+    font-family: 'Raleway', sans-serif;
+    font-weight: 300;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ─── HERO ─── */
+  .hero {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    background-color: var(--offwhite);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-left {
+    padding: 80px 64px 80px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero-eyebrow {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--salvia);
+    margin-bottom: 40px;
+    display: block;
+  }
+
+  .hero h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(44px, 5vw, 72px);
+    font-weight: 300;
+    line-height: 1.1;
+    color: var(--terracota);
+    margin-bottom: 32px;
+    letter-spacing: -0.5px;
+  }
+
+  .hero h1 em {
+    font-style: italic;
+    color: var(--text);
+  }
+
+  .hero-sub {
+    font-size: 15px;
+    color: var(--text-light);
+    max-width: 420px;
+    margin-bottom: 56px;
+    line-height: 1.8;
+  }
+
+  .hero-cta {
+    display: inline-block;
+    padding: 16px 40px;
+    background: var(--terracota);
+    color: var(--offwhite);
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    transition: background 0.3s ease;
+  }
+
+  .hero-cta:hover { background: var(--terracota-light); }
+
+  .hero-right {
+    height: 100vh;
+    background: var(--offwhite-dark);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-right::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 40% 60%, rgba(160,82,45,0.07) 0%, transparent 70%);
+  }
+
+  .hero-quote {
+    position: absolute;
+    bottom: 80px;
+    left: 48px;
+    right: 48px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(28px, 3vw, 42px);
+    font-weight: 300;
+    color: var(--terracota);
+    line-height: 1.25;
+  }
+
+  .hero-quote span {
+    display: block;
+    color: var(--text);
+    font-size: clamp(20px, 2vw, 28px);
+    margin-top: 8px;
+  }
+
+  .hero-deco {
+    position: absolute;
+    top: 48px;
+    left: 48px;
+    width: 1px;
+    height: 120px;
+    background: linear-gradient(to bottom, var(--terracota), transparent);
+  }
+
+  /* ─── INTRO ─── */
+  .intro {
+    padding: 120px 80px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .intro p {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(24px, 3vw, 36px);
+    font-weight: 300;
+    line-height: 1.5;
+    color: var(--text);
+  }
+
+  .intro p + p {
+    margin-top: 24px;
+    color: var(--text-light);
+    font-size: clamp(18px, 2vw, 26px);
+  }
+
+  .intro strong { font-weight: 500; color: var(--terracota); }
+
+  /* ─── DIVIDER ─── */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    max-width: 160px;
+    margin: 0 80px;
+  }
+  .divider-line { flex: 1; height: 1px; background: var(--bege); }
+  .divider-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--terracota); flex-shrink: 0; }
+
+  /* ─── SERVIÇOS ─── */
+  .servicos {
+    padding: 100px 0 0;
+  }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--salvia);
+    text-align: center;
+    margin-bottom: 64px;
+    display: block;
+  }
+
+  /* OPERARTE */
+  .operarte {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 560px;
+  }
+
+  .operarte-esquerda {
+    background: var(--offwhite-dark);
+    padding: 80px 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .servico-tag {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--terracota);
+    margin-bottom: 20px;
+  }
+
+  .servico-titulo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(32px, 4vw, 52px);
+    font-weight: 300;
+    color: var(--text);
+    line-height: 1.15;
+    margin-bottom: 8px;
+  }
+
+  .servico-subtitulo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(16px, 1.5vw, 20px);
+    font-style: italic;
+    color: var(--text-light);
+    margin-bottom: 40px;
+  }
+
+  .servico-para-quem {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.7;
+    margin-bottom: 40px;
+    padding-left: 20px;
+    border-left: 2px solid var(--bege);
+  }
+
+  .preco-bloco {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .preco-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-light);
+  }
+
+  .preco-valor {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 40px;
+    font-weight: 400;
+    color: var(--terracota);
+  }
+
+  .operarte-direita {
+    background: var(--offwhite-mid);
+    padding: 80px 64px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .bloco-titulo {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--salvia);
+    margin-bottom: 20px;
+  }
+
+  .entrega-lista {
+    list-style: none;
+    margin-bottom: 48px;
+  }
+
+  .entrega-lista li {
+    font-size: 13px;
+    color: var(--text-light);
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(44,44,44,0.07);
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    line-height: 1.5;
+  }
+
+  .entrega-lista li::before {
+    content: '—';
+    color: var(--terracota);
+    flex-shrink: 0;
+  }
+
+  .resultado-bloco {
+    background: var(--offwhite);
+    padding: 24px 28px;
+    border-left: 2px solid var(--terracota);
+  }
+
+  .resultado-bloco p {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.7;
+  }
+
+  .resultado-bloco strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* CICLOS */
+  .ciclos {
+    background: var(--offwhite);
+    padding: 80px;
+  }
+
+  .ciclos-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .ciclos-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--salvia);
+    margin-bottom: 48px;
+    display: block;
+  }
+
+  .ciclos-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+  }
+
+  .ciclo {
+    background: var(--offwhite-dark);
+    padding: 48px 40px;
+  }
+
+  .ciclo-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 64px;
+    font-weight: 300;
+    color: var(--bege);
+    line-height: 1;
+    margin-bottom: 24px;
+  }
+
+  .ciclo-nome {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--terracota);
+    margin-bottom: 10px;
+  }
+
+  .ciclo-titulo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+
+  .ciclo-desc {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.7;
+  }
+
+  /* COMO FUNCIONA */
+  .como {
+    background: var(--offwhite-dark);
+    padding: 100px 80px;
+  }
+
+  .como-inner {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .como-header {
+    margin-bottom: 72px;
+  }
+
+  .como-header h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(36px, 4vw, 52px);
+    font-weight: 300;
+    color: var(--text);
+    line-height: 1.2;
+    margin-top: 16px;
+  }
+
+  .passos { display: flex; flex-direction: column; }
+
+  .passo {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 40px;
+    padding: 48px 0;
+    border-bottom: 1px solid rgba(44,44,44,0.08);
+    align-items: start;
+  }
+
+  .passo:last-child { border-bottom: none; }
+
+  .passo-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 48px;
+    font-weight: 300;
+    color: var(--bege);
+    line-height: 1;
+  }
+
+  .passo-nome {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--terracota);
+    margin-bottom: 8px;
+  }
+
+  .passo-titulo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .passo-desc {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.7;
+  }
+
+  /* ─── GESTÃO RÉVEM ─── */
+  .gestao {
+    padding: 0;
+  }
+
+  .gestao-hero {
+    background: var(--offwhite);
+    padding: 100px 80px 80px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+    max-width: 100%;
+  }
+
+  .gestao-esquerda .servico-tag {
+    color: var(--salvia);
+  }
+
+  .gestao-esquerda .preco-bloco {
+    margin-top: 40px;
+  }
+
+  .gestao-esquerda p {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  .gestao-esquerda .servico-para-quem {
+    margin-bottom: 24px;
+  }
+
+  .gestao-direita {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .gestao-bloco {
+    background: var(--offwhite-dark);
+    padding: 32px 36px;
+  }
+
+  .gestao-bloco-titulo {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--terracota);
+    margin-bottom: 16px;
+  }
+
+  .gestao-bloco ul {
+    list-style: none;
+  }
+
+  .gestao-bloco ul li {
+    font-size: 12px;
+    color: var(--text-light);
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(44,44,44,0.06);
+    display: flex;
+    gap: 10px;
+    line-height: 1.5;
+  }
+
+  .gestao-bloco ul li:last-child { border-bottom: none; }
+
+  .gestao-bloco ul li::before {
+    content: '→';
+    color: var(--salvia);
+    flex-shrink: 0;
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  .gestao-diferenca {
+    background: var(--offwhite-mid);
+    padding: 64px 80px;
+  }
+
+  .gestao-diferenca-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px;
+    align-items: start;
+  }
+
+  .gestao-col-titulo {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+
+  .gestao-col-titulo.antes { color: var(--text-light); }
+  .gestao-col-titulo.depois { color: var(--salvia); }
+
+  .gestao-col ul {
+    list-style: none;
+  }
+
+  .gestao-col ul li {
+    font-size: 13px;
+    color: var(--text-light);
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(44,44,44,0.07);
+    line-height: 1.5;
+  }
+
+  .gestao-col ul li:last-child { border-bottom: none; }
+
+  .gestao-col.depois ul li {
+    color: var(--text);
+  }
+
+  .gestao-col.depois ul li strong {
+    color: var(--salvia);
+    font-weight: 500;
+  }
+
+  /* ─── DEPOIMENTOS ─── */
+  .depoimentos {
+    padding: 100px 80px;
+    background: var(--offwhite-dark);
+  }
+
+  .depoimentos-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .depoimentos-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2px;
+    margin-top: 56px;
+  }
+
+  .depoimento {
+    background: var(--offwhite);
+    padding: 48px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .depoimento-texto {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(16px, 1.5vw, 19px);
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1.65;
+    margin-bottom: 40px;
+  }
+
+  .depoimento-texto::before {
+    content: '"';
+    color: var(--terracota);
+    font-size: 48px;
+    line-height: 0;
+    vertical-align: -16px;
+    margin-right: 4px;
+    font-weight: 300;
+  }
+
+  .depoimento-autora {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-top: 24px;
+    border-top: 1px solid var(--bege);
+  }
+
+  .autora-inicial {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bege);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--terracota);
+    flex-shrink: 0;
+  }
+
+  .autora-nome {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .autora-role {
+    font-size: 11px;
+    color: var(--text-light);
+    letter-spacing: 0.5px;
+  }
+
+  @media (max-width: 900px) {
+    .depoimentos { padding: 80px 32px; }
+    .depoimentos-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ─── CTA FINAL ─── */
+  .cta-final {
+    padding: 140px 80px;
+    background: var(--offwhite-dark);
+    text-align: center;
+  }
+
+  .cta-final-inner {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .cta-final h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(36px, 5vw, 60px);
+    font-weight: 300;
+    color: var(--text);
+    line-height: 1.15;
+    margin: 16px 0 24px;
+  }
+
+  .cta-final h2 em {
+    font-style: italic;
+    color: var(--terracota);
+  }
+
+  .cta-final p {
+    font-size: 14px;
+    color: var(--text-light);
+    margin-bottom: 48px;
+    line-height: 1.7;
+  }
+
+  .cta-btn {
+    display: inline-block;
+    padding: 18px 48px;
+    background: var(--terracota);
+    color: var(--offwhite);
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    transition: background 0.3s ease;
+  }
+
+  .cta-btn:hover { background: var(--terracota-light); }
+
+  .assinatura {
+    margin-top: 64px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 14px;
+    font-style: italic;
+    color: var(--bege);
+  }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-right { display: none; }
+    .hero-left { padding: 80px 32px; }
+    .operarte { grid-template-columns: 1fr; }
+    .ciclos-grid { grid-template-columns: 1fr; }
+    .gestao-hero { grid-template-columns: 1fr; gap: 48px; padding: 80px 32px; }
+    .gestao-diferenca { padding: 64px 32px; }
+    .gestao-diferenca-inner { grid-template-columns: 1fr; gap: 40px; }
+    .como { padding: 80px 32px; }
+    .ciclos { padding: 80px 32px; }
+    .intro { padding: 80px 32px; }
+    .divider { margin: 0 32px; }
+    .cta-final { padding: 100px 32px; }
+    .operarte-esquerda { padding: 64px 32px; }
+    .operarte-direita { padding: 64px 32px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <span class="hero-eyebrow">Révem Ateliê de Gestão</span>
+    <h1>Sua arte no palco.<br><em>Nossa estrutura<br>no bastidor.</em></h1>
+    <p class="hero-sub">Para a fotógrafa que já tem resultado — mas ainda carrega o peso de um negócio que depende 100% dela. Construímos o bastidor que você merece.</p>
+    <a href="#servicos" class="hero-cta">Conhecer os serviços</a>
+  </div>
+  <div class="hero-right">
+    <div class="hero-deco"></div>
+    <div class="hero-quote">
+      Seu bastidor merece o mesmo cuidado que você dá às suas fotos.
+      <span>— Maressa Almeida</span>
+    </div>
+  </div>
+</section>
+
+<!-- INTRO -->
+<section class="intro">
+  <p>Tem um momento na carreira de uma fotógrafa em que o problema deixa de ser conseguir clientes e passa a ser <strong>sustentar o que foi construído sem quebrar no processo.</strong></p>
+  <p>Você já está nesse momento. Não tem problema de talento nem de cliente. Tem problema de estrutura. E estrutura se instala.</p>
+</section>
+
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-dot"></div>
+  <div class="divider-line"></div>
+</div>
+
+<!-- SERVIÇOS -->
+<section class="servicos" id="servicos">
+  <span class="section-label">Nossas Soluções</span>
+
+  <!-- OPERARTE -->
+  <div class="operarte">
+    <div class="operarte-esquerda">
+      <p class="servico-tag">Estruturação · 13 Semanas</p>
+      <h2 class="servico-titulo">OPERARTE</h2>
+      <p class="servico-subtitulo">A Arquitetura do Negócio</p>
+      <p class="servico-para-quem">Para a fotógrafa que já tem resultado, mas o negócio ainda depende 100% dela. Não é curso. Não é consultoria. É uma obra: nossa equipe entra no seu negócio, constrói a fundação completa — atendimento, operação, pós-venda e gestão — e entrega funcionando.</p>
+      <div class="preco-bloco">
+        <span class="preco-label">Investimento</span>
+        <span class="preco-valor">R$ 4.000</span>
+      </div>
+    </div>
+    <div class="operarte-direita">
+      <p class="bloco-titulo">O que é instalado</p>
+      <ul class="entrega-lista">
+        <li>CRM de leads com funil personalizado e scripts no seu tom de voz</li>
+        <li>Processo comercial completo documentado e delegável</li>
+        <li>Fluxo de produção por tipo de ensaio com checklists operacionais</li>
+        <li>Gestão de clientes do fechamento até a entrega</li>
+        <li>Pós-venda estruturado e régua de relacionamento</li>
+        <li>Financeiro completo com dashboard de lucro real</li>
+        <li>Métricas essenciais e rituais de gestão</li>
+      </ul>
+      <div class="resultado-bloco">
+        <p><strong>O resultado:</strong> Você para de improvisar e começa a ter uma empresa que funciona mesmo quando você não está olhando para tudo. Você sai com as chaves — não com um plano para executar.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPERARTE ANTES/DEPOIS -->
+  <div class="gestao-diferenca" style="background: var(--offwhite-dark);">
+    <div class="gestao-diferenca-inner">
+      <div class="gestao-col antes">
+        <p class="gestao-col-titulo antes">Sem o Operarte</p>
+        <ul>
+          <li>Atendimento depende da sua memória e energia</li>
+          <li>Cada projeto começa do zero, sem padrão</li>
+          <li>Você não sabe onde cada cliente está no processo</li>
+          <li>Pós-venda esquecido — cliente some após a entrega</li>
+          <li>Financeiro é uma planilha solta, sem visão real</li>
+          <li>O negócio para quando você para</li>
+        </ul>
+      </div>
+      <div class="gestao-col depois">
+        <p class="gestao-col-titulo depois">Com o Operarte instalado</p>
+        <ul>
+          <li><strong>Sistema de atendimento</strong> pronto para delegar</li>
+          <li><strong>Fluxo de produção</strong> padronizado por tipo de ensaio</li>
+          <li>Você sabe exatamente <strong>onde cada cliente está</strong></li>
+          <li><strong>Pós-venda executado</strong> com régua de relacionamento</li>
+          <li><strong>Dashboard financeiro</strong> com lucro real visível</li>
+          <li>O negócio funciona <strong>mesmo quando você não está</strong></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- CICLOS -->
+  <div class="ciclos">
+    <div class="ciclos-inner">
+      <span class="ciclos-label">Como o Operarte é construído</span>
+      <div class="ciclos-grid">
+        <div class="ciclo">
+          <div class="ciclo-num">01</div>
+          <p class="ciclo-nome">Semanas 1–4</p>
+          <h3 class="ciclo-titulo">Atendimento</h3>
+          <p class="ciclo-desc">CRM instalado, scripts no seu tom de voz, funil personalizado. Você vende com segurança e o processo pode ser delegado.</p>
+        </div>
+        <div class="ciclo">
+          <div class="ciclo-num">02</div>
+          <p class="ciclo-nome">Semanas 5–8</p>
+          <h3 class="ciclo-titulo">Operação</h3>
+          <p class="ciclo-desc">Fluxo de produção do fechamento até a entrega, checklists por tipo de ensaio, gestão de clientes. Você nunca mais se perde entre projetos.</p>
+        </div>
+        <div class="ciclo">
+          <div class="ciclo-num">03</div>
+          <p class="ciclo-nome">Semanas 9–12</p>
+          <h3 class="ciclo-titulo">Pós-venda e Gestão</h3>
+          <p class="ciclo-desc">Jornada da cliente mapeada, régua de relacionamento, financeiro com dashboard de lucro real. Você toma decisões com base em dados.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMO FUNCIONA -->
+  <div class="como">
+    <div class="como-inner">
+      <div class="como-header">
+        <span class="section-label" style="text-align:left;">A Jornada</span>
+        <h2>Nós construímos.<br>Você valida e opera.</h2>
+      </div>
+      <div class="passos">
+        <div class="passo">
+          <div class="passo-num">01</div>
+          <div>
+            <p class="passo-nome">Raio-X</p>
+            <h3 class="passo-titulo">Você nos conta o negócio real</h3>
+            <p class="passo-desc">Você preenche o dossiê do ciclo com materiais reais — conversas de WhatsApp, contratos existentes, controles atuais. Quanto mais real, mais precisa a entrega.</p>
+          </div>
+        </div>
+        <div class="passo">
+          <div class="passo-num">02</div>
+          <div>
+            <p class="passo-nome">Instalação</p>
+            <h3 class="passo-titulo">Nós construímos no bastidor</h3>
+            <p class="passo-desc">Nossa equipe analisa, customiza e instala o sistema no seu Notion. Você não aprende como fazer — recebe pronto. Entregamos com um vídeo tour explicando cada parte.</p>
+          </div>
+        </div>
+        <div class="passo">
+          <div class="passo-num">03</div>
+          <div>
+            <p class="passo-nome">Passagem de Bastão</p>
+            <h3 class="passo-titulo">Você aprova, ajusta e opera</h3>
+            <p class="passo-desc">Sessão ao vivo para validar o sistema, fazer ajustes finos e tirar dúvidas. Você sai com as chaves da nova estrutura — pronta para usar com autonomia.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GESTÃO RÉVEM -->
+<section class="gestao" id="gestao">
+  <span class="section-label" style="padding-top: 80px; display: block;">Gestão Recorrente</span>
+
+  <div class="gestao-hero">
+    <div class="gestao-esquerda">
+      <p class="servico-tag">Execução Recorrente · Mensal</p>
+      <h2 class="servico-titulo">GESTÃO RÉVEM</h2>
+      <p class="servico-subtitulo">O Concierge do Bastidor</p>
+      <p class="servico-para-quem">Para quem já tem a estrutura instalada e quer sair do operacional pós-venda. Você continua vendendo, decidindo, fotografando — mas para de ser a única responsável por lembrar, executar e acompanhar cada etapa do bastidor.</p>
+      <p>Você fecha a venda e nos avisa. Contrato, cobrança, confirmação, lembrete, pós-venda — tudo isso vira responsabilidade nossa. Toda segunda-feira você recebe um resumo dizendo exatamente com quem falar e o que está pendente.</p>
+      <p>Não somos comercial. Não fazemos atendimento de leads nem negociamos em seu nome. Operamos o que já existe — com precisão.</p>
+      <div class="preco-bloco">
+        <span class="preco-label">Investimento</span>
+        <span class="preco-valor">R$ 850<span style="font-size:20px; color: var(--text-light)">/mês</span></span>
+      </div>
+    </div>
+    <div class="gestao-direita">
+      <div class="gestao-bloco">
+        <p class="gestao-bloco-titulo">Operação contínua</p>
+        <ul>
+          <li>Monitoramento de leads e cadastro no CRM</li>
+          <li>Acompanhamento do pipeline de vendas e produção</li>
+          <li>Envio de contratos e links de pagamento</li>
+          <li>Registro e controle de pagamentos recebidos</li>
+          <li>Confirmações de ensaio e lembretes ao cliente</li>
+        </ul>
+      </div>
+      <div class="gestao-bloco">
+        <p class="gestao-bloco-titulo">Pós-venda em execução</p>
+        <ul>
+          <li>Pesquisas de satisfação pós-entrega</li>
+          <li>Mensagens de datas especiais (quando configurado)</li>
+          <li>Identificação de oportunidades de reativação</li>
+          <li>Campanhas com script pré-aprovado por você</li>
+        </ul>
+      </div>
+      <div class="gestao-bloco">
+        <p class="gestao-bloco-titulo">Inteligência do negócio</p>
+        <ul>
+          <li>Resumo semanal toda segunda: o que fizemos + o que você precisa fazer</li>
+          <li>Mapa mensal: funil, origem de clientes, saúde financeira, oportunidades</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="gestao-diferenca">
+    <div class="gestao-diferenca-inner">
+      <div class="gestao-col antes">
+        <p class="gestao-col-titulo antes">Sem a Gestão Révem</p>
+        <ul>
+          <li>Você fecha a venda — e ainda envia o contrato</li>
+          <li>Você lembra de cobrar o pagamento</li>
+          <li>Você confirma o ensaio e manda o lembrete</li>
+          <li>Você lembra de pedir depoimento</li>
+          <li>Você tenta lembrar quem precisa de follow-up</li>
+          <li>Você não sabe exatamente o que está acontecendo no negócio</li>
+        </ul>
+      </div>
+      <div class="gestao-col depois">
+        <p class="gestao-col-titulo depois">Com a Gestão Révem</p>
+        <ul>
+          <li>Você fecha a venda — <strong>nos avisa</strong></li>
+          <li><strong>Nós enviamos</strong> o contrato e cobramos</li>
+          <li><strong>Nós confirmamos</strong> e mandamos o lembrete</li>
+          <li><strong>Nós executamos</strong> o pós-venda</li>
+          <li>Toda segunda: lista clara do que você precisa fazer</li>
+          <li>Todo mês: mapa de inteligência do seu negócio</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEPOIMENTOS -->
+<section class="depoimentos">
+  <div class="depoimentos-inner">
+    <span class="section-label" style="text-align:left;">Nossas artistas</span>
+    <div class="depoimentos-grid">
+      <div class="depoimento">
+        <p class="depoimento-texto">Quando olho pra trás e faço uma retrospectiva do que a Juliana Paluzzi era antes de você chegar, percebo o quanto você me ajudou a crescer e principalmente acreditar em mim. Não foram apenas números e organização de um CNPJ... foi uma parceria de mãos dadas uma a outra.</p>
+        <div class="depoimento-autora">
+          <div class="autora-inicial">J</div>
+          <div>
+            <p class="autora-nome">Juliana Paluzzi</p>
+            <p class="autora-role">Fotógrafa de Famílias</p>
+          </div>
+        </div>
+      </div>
+      <div class="depoimento">
+        <p class="depoimento-texto">Meu negócio estava desorganizado, cada informação em um lugar diferente. Depois que a Révem estruturou meu bastidor completo, as coisas começaram a fluir com muito mais leveza.</p>
+        <div class="depoimento-autora">
+          <div class="autora-inicial">F</div>
+          <div>
+            <p class="autora-nome">Fernanda Cerioni</p>
+            <p class="autora-role">Fotógrafa Pet</p>
+          </div>
+        </div>
+      </div>
+      <div class="depoimento">
+        <p class="depoimento-texto">Eu já havia trabalhado com outras pessoas no atendimento. Quando precisei contratar de novo, não pensei em outra pessoa senão a Maressa. Além de ela ser fotógrafa (o que facilitou muito), ela tem um conhecimento absurdo em processos e jornada do cliente. Desde que a Révem entrou, eu parei de microgerenciar e passei a confiar 100% no que era feito nos bastidores. Trabalhar com a Maressa me possibilitou pensar em estratégia e crescer minha empresa.</p>
+        <div class="depoimento-autora">
+          <div class="autora-inicial">B</div>
+          <div>
+            <p class="autora-nome">Bia Alves</p>
+            <p class="autora-role">Fotógrafa e Mentora de Fotógrafas</p>
+          </div>
+        </div>
+      </div>
+      <div class="depoimento">
+        <p class="depoimento-texto">É um grande alívio saber que não preciso ficar conferindo tudo, ou ficar preocupada se as coisas estão sendo feitas do jeito certo. Você resolve tudo, e resolve melhor do que eu toda essa parte de gestão. Sem contar a sua responsabilidade, que é muito nítida. Você sabe bem como eu estava antes de você chegar... estressada, sobrecarregada e já totalmente desanimada de tentar treinar pessoas que não tinham esse mesmo compromisso.</p>
+        <div class="depoimento-autora">
+          <div class="autora-inicial">A</div>
+          <div>
+            <p class="autora-nome">Aline Tunala</p>
+            <p class="autora-role">Fotógrafa Infantil</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="cta-final">
+  <div class="cta-final-inner">
+    <span class="section-label">Próximo passo</span>
+    <h2>Pronta para ter um negócio com <em>estrutura real?</em></h2>
+    <p>Vamos conversar para entender qual serviço faz mais sentido para o seu momento agora.</p>
+    <a href="https://wa.me/5522992624131" class="cta-btn">Quero conversar</a>
+    <p class="assinatura">"Arte com estrutura. Negócio com alma."</p>
+  </div>
+</section>
+
+</body>
+</html>
