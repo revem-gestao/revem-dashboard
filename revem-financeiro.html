@@ -13,7 +13,6 @@ input[type=month],input[type=number],input[type=text],select{-webkit-appearance:
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:#D4C8B8;border-radius:3px}
-.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 </style>
 </head>
 <body>
@@ -21,14 +20,15 @@ input[type=month],input[type=number],input[type=text],select{-webkit-appearance:
 
 <script src="https://unpkg.com/firebase@8.10.1/firebase-app.js"></script>
 <script src="https://unpkg.com/firebase@8.10.1/firebase-database.js"></script>
-<script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
 <script>
-// ── FIREBASE CONFIG ──────────────────────────────────────────────────────────
-const firebaseConfig = {
+const { useState, useEffect, useCallback, useMemo, useRef, Fragment } = React;
+
+// ── FIREBASE ─────────────────────────────────────────────────────────────────
+firebase.initializeApp({
   apiKey: "AIzaSyA0MUhrlIjwZD3NeSxmoC6zehKGdv1j3yc",
   authDomain: "revem-financeiro.firebaseapp.com",
   databaseURL: "https://revem-financeiro-default-rtdb.firebaseio.com",
@@ -36,15 +36,9 @@ const firebaseConfig = {
   storageBucket: "revem-financeiro.firebasestorage.app",
   messagingSenderId: "965762837378",
   appId: "1:965762837378:web:2466a72e7fb7bbbaa97d9b"
-};
-firebase.initializeApp(firebaseConfig);
+});
 const db = firebase.database();
 const DB_REF = '/revem_fin';
-
-// ── REACT + RECHARTS ─────────────────────────────────────────────────────────
-const { useState, useEffect, useCallback, useMemo, Fragment } = React;
-const { BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
-        XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = Recharts;
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 const MC = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -62,84 +56,148 @@ const brl = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}
 const mesAno = (a=ANO) => Array.from({length:12},(_,i)=>`${a}-${String(i+1).padStart(2,'0')}`);
 const empty = () => ({ contratos:[], despesas:[], conf:{}, despReal:{} });
 
-// ── FIREBASE STORAGE ─────────────────────────────────────────────────────────
+// ── STORAGE ──────────────────────────────────────────────────────────────────
 let saveTimer = null;
-const saveToFirebase = (data) => {
+const saveToFB = (data) => {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    db.ref(DB_REF).set(data).catch(e => console.error('Firebase save error:', e));
-  }, 800);
+  saveTimer = setTimeout(() => db.ref(DB_REF).set(data).catch(console.error), 800);
 };
+const loadFromFB = () => db.ref(DB_REF).get().then(s => s.val() || empty());
 
-const loadFromFirebase = () => {
-  return db.ref(DB_REF).get().then(snap => snap.val() || empty());
-};
-
-// ── BACKUP EXPORT / IMPORT ───────────────────────────────────────────────────
 const exportarJSON = (data) => {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `revem-financeiro-backup-${mesNow()}.json`;
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.download = `revem-backup-${mesNow()}.json`;
   a.click();
-  URL.revokeObjectURL(url);
 };
-
-const importarJSON = (file, onSuccess) => {
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      db.ref(DB_REF).set(data).then(() => onSuccess(data));
-    } catch(err) {
-      alert('Arquivo inválido. Use um backup gerado por este sistema.');
-    }
-  };
-  reader.readAsText(file);
+const importarJSON = (file, cb) => {
+  const r = new FileReader();
+  r.onload = e => { try { const d=JSON.parse(e.target.result); db.ref(DB_REF).set(d).then(()=>cb(d)); } catch{ alert('Arquivo inválido.'); } };
+  r.readAsText(file);
 };
 
 // ── BUSINESS LOGIC ────────────────────────────────────────────────────────────
 const gParcelas = c => {
-  if(!c || c.status !== 'ativo') return [];
-  const ps = [];
+  if(!c||c.status!=='ativo') return [];
+  const ps=[];
   if(c.recorrente){
-    let m = c.mesInicio, fim = `${ANO+1}-12`;
-    while(m <= fim){ if(!c.mesCancel || m <= c.mesCancel) ps.push({mes:m, valor:c.valorMensal}); m = addM(m,1); }
+    let m=c.mesInicio, fim=`${ANO+1}-12`;
+    while(m<=fim){ if(!c.mesCancel||m<=c.mesCancel) ps.push({mes:m,valor:c.valorMensal}); m=addM(m,1); }
   } else {
-    for(let i=0;i<c.numParcelas;i++) ps.push({mes:addM(c.mesInicio,i), valor:c.valorParcela});
+    for(let i=0;i<c.numParcelas;i++) ps.push({mes:addM(c.mesInicio,i),valor:c.valorParcela});
   }
   return ps;
 };
-
 const gExp = d => {
   if(!d.ativo) return [];
-  if(!d.recorrente) return [{mes:d.mesInicio, valor:d.valor}];
+  if(!d.recorrente) return [{mes:d.mesInicio,valor:d.valor}];
   const es=[]; let m=d.mesInicio, fim=`${ANO+1}-12`;
-  while(m<=fim){ es.push({mes:m, valor:d.valor}); m=addM(m,1); }
-  return d.mesFim ? es.filter(e=>e.mes<=d.mesFim) : es;
+  while(m<=fim){ es.push({mes:m,valor:d.valor}); m=addM(m,1); }
+  return d.mesFim?es.filter(e=>e.mes<=d.mesFim):es;
 };
-
-const buildFluxo = (contratos, despesas, conf, despReal, ano=ANO) =>
-  mesAno(ano).map(mes => {
-    let prev=0, rec=0, dPrev=0, dReal=0;
-    contratos.forEach(c => {
-      const p = gParcelas(c).find(x=>x.mes===mes);
-      if(p){ prev+=p.valor; const k=`${c.id}_${mes}`; if(conf[k]?.ok) rec+=conf[k].valor??p.valor; }
-    });
-    despesas.forEach(d => {
-      const e = gExp(d).find(x=>x.mes===mes);
-      if(e){ dPrev+=e.valor; const k=`${d.id}_${mes}`; if(despReal[k]?.ok) dReal+=despReal[k].valor??e.valor; }
-    });
-    return {mes, nome:MC[midx(mes)], prev, rec, dPrev, dReal, saldoPrev:prev-dPrev, saldoReal:rec-dReal};
+const buildFluxo = (contratos,despesas,conf,despReal,ano=ANO) =>
+  mesAno(ano).map(mes=>{
+    let prev=0,rec=0,dPrev=0,dReal=0;
+    contratos.forEach(c=>{ const p=gParcelas(c).find(x=>x.mes===mes); if(p){ prev+=p.valor; const k=`${c.id}_${mes}`; if(conf[k]?.ok) rec+=conf[k].valor??p.valor; } });
+    despesas.forEach(d=>{ const e=gExp(d).find(x=>x.mes===mes); if(e){ dPrev+=e.valor; const k=`${d.id}_${mes}`; if(despReal[k]?.ok) dReal+=despReal[k].valor??e.valor; } });
+    return {mes,nome:MC[midx(mes)],prev,rec,dPrev,dReal,saldoPrev:prev-dPrev,saldoReal:rec-dReal};
   });
-
 const calcMRR = contratos => {
-  const m = mesNow();
-  return contratos
-    .filter(c=>c.recorrente&&c.status==='ativo'&&c.mesInicio<=m&&(!c.mesCancel||c.mesCancel>=m))
-    .reduce((s,c)=>s+c.valorMensal, 0);
+  const m=mesNow();
+  return contratos.filter(c=>c.recorrente&&c.status==='ativo'&&c.mesInicio<=m&&(!c.mesCancel||c.mesCancel>=m)).reduce((s,c)=>s+c.valorMensal,0);
 };
+
+// ── CHART COMPONENTS (Chart.js) ──────────────────────────────────────────────
+function BarChart({ data, keys, colors, labels, height=200 }) {
+  const ref = useRef(null);
+  const inst = useRef(null);
+  useEffect(() => {
+    if(!ref.current) return;
+    if(inst.current) inst.current.destroy();
+    inst.current = new Chart(ref.current, {
+      type:'bar',
+      data:{
+        labels: data.map(d=>d.nome),
+        datasets: keys.map((k,i)=>({ label:labels[i], data:data.map(d=>d[k]), backgroundColor:colors[i], borderRadius:3, borderSkipped:false }))
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>brl(ctx.raw)}}},
+        scales:{
+          x:{grid:{display:false}, ticks:{font:{size:11},color:'#A8A29E'}, border:{display:false}},
+          y:{grid:{color:'#F0EDE8'}, ticks:{font:{size:11},color:'#A8A29E',callback:v=>`R$${(v/1000).toFixed(0)}k`}, border:{display:false}}
+        }
+      }
+    });
+    return ()=>{ if(inst.current){ inst.current.destroy(); inst.current=null; } };
+  }, [JSON.stringify(data)]);
+  return React.createElement('div',{style:{position:'relative',height}}, React.createElement('canvas',{ref}));
+}
+
+function StackedBarChart({ data, keys, colors, labels, height=210 }) {
+  const ref = useRef(null);
+  const inst = useRef(null);
+  useEffect(() => {
+    if(!ref.current) return;
+    if(inst.current) inst.current.destroy();
+    inst.current = new Chart(ref.current, {
+      type:'bar',
+      data:{
+        labels: data.map(d=>d.nome),
+        datasets: keys.map((k,i)=>({ label:labels[i], data:data.map(d=>d[k]), backgroundColor:colors[i], borderRadius:i===keys.length-1?3:0, stack:'a' }))
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>brl(ctx.raw)}}},
+        scales:{
+          x:{grid:{display:false}, ticks:{font:{size:11},color:'#A8A29E'}, border:{display:false}, stacked:true},
+          y:{grid:{color:'#F0EDE8'}, ticks:{font:{size:11},color:'#A8A29E',callback:v=>`R$${(v/1000).toFixed(0)}k`}, border:{display:false}, stacked:true}
+        }
+      }
+    });
+    return ()=>{ if(inst.current){ inst.current.destroy(); inst.current=null; } };
+  }, [JSON.stringify(data)]);
+  return React.createElement('div',{style:{position:'relative',height}}, React.createElement('canvas',{ref}));
+}
+
+function DonutChart({ data, height=150 }) {
+  const ref = useRef(null);
+  const inst = useRef(null);
+  useEffect(() => {
+    if(!ref.current||!data.length) return;
+    if(inst.current) inst.current.destroy();
+    inst.current = new Chart(ref.current, {
+      type:'doughnut',
+      data:{ labels:data.map(d=>d.n), datasets:[{ data:data.map(d=>d.v), backgroundColor:CORES, borderWidth:0, hoverOffset:4 }] },
+      options:{ responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>brl(ctx.raw)}}} }
+    });
+    return ()=>{ if(inst.current){ inst.current.destroy(); inst.current=null; } };
+  }, [JSON.stringify(data)]);
+  return React.createElement('div',{style:{position:'relative',height}}, React.createElement('canvas',{ref}));
+}
+
+function AreaChart({ data, dataKey, height=170 }) {
+  const ref = useRef(null);
+  const inst = useRef(null);
+  useEffect(() => {
+    if(!ref.current) return;
+    if(inst.current) inst.current.destroy();
+    inst.current = new Chart(ref.current, {
+      type:'line',
+      data:{ labels:data.map(d=>d.nome), datasets:[{ data:data.map(d=>d[dataKey]), borderColor:'#A67C52', backgroundColor:'rgba(166,124,82,0.08)', fill:true, tension:0.4, borderWidth:2, pointRadius:0 }] },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>brl(ctx.raw)}}},
+        scales:{
+          x:{grid:{display:false}, ticks:{font:{size:11},color:'#A8A29E'}, border:{display:false}},
+          y:{grid:{color:'#F0EDE8'}, ticks:{font:{size:11},color:'#A8A29E',callback:v=>`R$${(v/1000).toFixed(0)}k`}, border:{display:false}}
+        }
+      }
+    });
+    return ()=>{ if(inst.current){ inst.current.destroy(); inst.current=null; } };
+  }, [JSON.stringify(data)]);
+  return React.createElement('div',{style:{position:'relative',height}}, React.createElement('canvas',{ref}));
+}
 
 // ── STYLES ───────────────────────────────────────────────────────────────────
 const S = {
@@ -153,28 +211,16 @@ const S = {
   td:{padding:'11px 14px',fontSize:13,color:'#1C1917'},
 };
 
-// ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
+// ── SHARED ───────────────────────────────────────────────────────────────────
 const FLD = ({label,children}) => React.createElement('div',null,
-  React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:5}},label),
-  children
-);
-const Chip = ({children,muted}) => React.createElement('span',{
-  style:{fontSize:11,background:'#F7F5F0',padding:'2px 8px',borderRadius:12,color:muted?'#A8A29E':'#78716C'}
-},children);
-const Empty = ({msg}) => React.createElement('div',{
-  style:{textAlign:'center',padding:'40px 0',color:'#A8A29E',fontSize:13}
-},msg);
-const GrpLbl = ({label,mt}) => React.createElement('div',{
-  style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8,marginTop:mt||0}
-},label);
-const Leg = ({cor,label}) => React.createElement('div',{
-  style:{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#78716C'}
-},React.createElement('span',{style:{width:12,height:8,background:cor,borderRadius:2,display:'inline-block'}}),label);
+  React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:5}},label), children);
+const Chip = ({children,muted}) => React.createElement('span',{style:{fontSize:11,background:'#F7F5F0',padding:'2px 8px',borderRadius:12,color:muted?'#A8A29E':'#78716C'}},children);
+const Empty = ({msg}) => React.createElement('div',{style:{textAlign:'center',padding:'40px 0',color:'#A8A29E',fontSize:13}},msg);
+const GrpLbl = ({label,mt}) => React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8,marginTop:mt||0}},label);
+const Leg = ({cor,label}) => React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#78716C'}},
+  React.createElement('span',{style:{width:12,height:8,background:cor,borderRadius:2,display:'inline-block'}}),label);
 const ChCard = ({title,children}) => React.createElement('div',{style:S.chart},
-  React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:16}},title),
-  children
-);
-const ttStyle = {border:'1px solid #E7E5E0',borderRadius:8,fontSize:12,background:'#fff'};
+  React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:16}},title), children);
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function Dashboard({fluxo,mrr,fma,totalPrev,porServico}){
@@ -194,16 +240,7 @@ function Dashboard({fluxo,mrr,fma,totalPrev,porServico}){
     ),
     React.createElement('div',{style:{display:'grid',gridTemplateColumns:'3fr 2fr',gap:12}},
       React.createElement(ChCard,{title:'Receita Mensal'},
-        React.createElement(ResponsiveContainer,{width:'100%',height:200},
-          React.createElement(BarChart,{data:fluxo,barGap:3,barCategoryGap:'35%'},
-            React.createElement(CartesianGrid,{strokeDasharray:'2 4',vertical:false,stroke:'#F0EDE8'}),
-            React.createElement(XAxis,{dataKey:'nome',tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false}),
-            React.createElement(YAxis,{tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false,tickFormatter:v=>`R$${(v/1000).toFixed(0)}k`}),
-            React.createElement(Tooltip,{formatter:v=>brl(v),contentStyle:ttStyle}),
-            React.createElement(Bar,{dataKey:'prev',name:'Previsto',fill:'#E7E5E0',radius:[3,3,0,0]}),
-            React.createElement(Bar,{dataKey:'rec',name:'Recebido',fill:'#A67C52',radius:[3,3,0,0]})
-          )
-        ),
+        React.createElement(BarChart,{data:fluxo,keys:['prev','rec'],colors:['#E7E5E0','#A67C52'],labels:['Previsto','Recebido']}),
         React.createElement('div',{style:{display:'flex',gap:16,marginTop:10}},
           React.createElement(Leg,{cor:'#E7E5E0',label:'Previsto'}),
           React.createElement(Leg,{cor:'#A67C52',label:'Recebido'})
@@ -213,14 +250,7 @@ function Dashboard({fluxo,mrr,fma,totalPrev,porServico}){
         porServico.length===0
           ? React.createElement(Empty,{msg:'Sem contratos no ano'})
           : React.createElement('div',null,
-              React.createElement(ResponsiveContainer,{width:'100%',height:150},
-                React.createElement(PieChart,null,
-                  React.createElement(Pie,{data:porServico,cx:'50%',cy:'50%',innerRadius:42,outerRadius:65,dataKey:'v',paddingAngle:2},
-                    porServico.map((_,i)=>React.createElement(Cell,{key:i,fill:CORES[i%CORES.length]}))
-                  ),
-                  React.createElement(Tooltip,{formatter:v=>brl(v),contentStyle:ttStyle})
-                )
-              ),
+              React.createElement(DonutChart,{data:porServico}),
               porServico.map((s,i)=>React.createElement('div',{key:i,style:{display:'flex',justifyContent:'space-between',fontSize:12,padding:'5px 0',borderTop:'1px solid #F0EDE8'}},
                 React.createElement('div',{style:{display:'flex',gap:6,alignItems:'center',color:'#78716C'}},
                   React.createElement('span',{style:{width:8,height:8,borderRadius:'50%',background:CORES[i%CORES.length],flexShrink:0}}),s.n
@@ -245,8 +275,7 @@ function Contratos({data,upd}){
   const salvar=()=>{
     if(!form.cliente) return;
     const vm=parseFloat(form.valorMensal)||0, vt=parseFloat(form.valorTotal)||0, np=parseInt(form.numParcelas)||1;
-    const vp=form.recorrente?vm:(vt/np);
-    const c={...form,id:editId||gid(),valorMensal:vm,valorTotal:vt,numParcelas:np,valorParcela:vp,status:'ativo'};
+    const c={...form,id:editId||gid(),valorMensal:vm,valorTotal:vt,numParcelas:np,valorParcela:form.recorrente?vm:(vt/np),status:'ativo'};
     upd(p=>({...p,contratos:editId?p.contratos.map(x=>x.id===editId?c:x):[...p.contratos,c]}));
     setShow(false);
   };
@@ -300,10 +329,10 @@ function Contratos({data,upd}){
         React.createElement('button',{onClick:salvar,style:S.prim},'Salvar')
       )
     ),
-    data.contratos.length===0&&!show&&React.createElement(Empty,{msg:'Nenhum contrato cadastrado. Comece adicionando seus contratos ativos.'}),
+    data.contratos.length===0&&!show&&React.createElement(Empty,{msg:'Nenhum contrato cadastrado ainda.'}),
     ativos.length>0&&React.createElement('div',null,
       React.createElement(GrpLbl,{label:'Ativos'}),
-      ativos.map(c=>React.createElement(CRow,{key:c.id,c,onEdit:()=>abrir(c),onEnc:()=>enc(c.id),onDel:()=>del(c.id)}))
+      ativos.map(c=>React.createElement(CRow,{key:c.id,c,onEdit:()=>abrir(c),onEnc:()=>enc(c.id)}))
     ),
     encerrados.length>0&&React.createElement('div',{style:{marginTop:22,opacity:0.55}},
       React.createElement(GrpLbl,{label:'Encerrados'}),
@@ -349,7 +378,7 @@ function Despesas({data,upd}){
   const abrir=(d=null)=>{ setForm(d?{...d,valor:String(d.valor)}:df()); setEditId(d?.id||null); setShow(true); };
   const salvar=()=>{ if(!form.descricao||!form.valor) return; const d={...form,id:editId||gid(),valor:parseFloat(form.valor)||0}; upd(p=>({...p,despesas:editId?p.despesas.map(x=>x.id===editId?d:x):[...p.despesas,d]})); setShow(false); };
   const tog=id=>upd(p=>({...p,despesas:p.despesas.map(d=>d.id===id?{...d,ativo:!d.ativo}:d)}));
-  const del=id=>{ if(confirm('Excluir esta despesa?')) upd(p=>({...p,despesas:p.despesas.filter(d=>d.id!==id)})); };
+  const del=id=>{ if(confirm('Excluir?')) upd(p=>({...p,despesas:p.despesas.filter(d=>d.id!==id)})); };
 
   const ativas=data.despesas.filter(d=>d.ativo);
   const totalFix=ativas.filter(d=>d.recorrente).reduce((s,d)=>s+d.valor,0);
@@ -362,7 +391,7 @@ function Despesas({data,upd}){
     show&&React.createElement('div',{style:{...S.card,border:'1px solid #A67C52',marginBottom:18}},
       React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:600,color:'#1C1917',marginBottom:18}},editId?'Editar Despesa':'Nova Despesa'),
       React.createElement('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:12,marginBottom:12}},
-        React.createElement(FLD,{label:'Descrição'},React.createElement('input',{style:S.inp,value:form.descricao,onChange:e=>set('descricao',e.target.value),placeholder:'Ex: Notion, Google Workspace, freelancer...'})),
+        React.createElement(FLD,{label:'Descrição'},React.createElement('input',{style:S.inp,value:form.descricao,onChange:e=>set('descricao',e.target.value),placeholder:'Ex: Notion, Google Workspace...'})),
         React.createElement(FLD,{label:'Valor (R$)'},React.createElement('input',{style:S.inp,type:'number',value:form.valor,onChange:e=>set('valor',e.target.value),placeholder:'0,00'}))
       ),
       React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}},
@@ -407,7 +436,7 @@ function Despesas({data,upd}){
   );
 }
 
-// ── FLUXO DE CAIXA ────────────────────────────────────────────────────────────
+// ── FLUXO ─────────────────────────────────────────────────────────────────────
 function FluxoCaixa({fluxo,data,upd}){
   const [exp,setExp]=useState(null);
   const ma=mesNow();
@@ -419,9 +448,7 @@ function FluxoCaixa({fluxo,data,upd}){
     React.createElement('div',{style:{background:'#fff',border:'1px solid #E7E5E0',borderRadius:12,overflow:'hidden',marginBottom:16}},
       React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
         React.createElement('thead',null,
-          React.createElement('tr',null,
-            ['Mês','Previsto','Recebido','Despesa','Saldo Prev.','Saldo Real',''].map((h,i)=>React.createElement('th',{key:i,style:S.th},h))
-          )
+          React.createElement('tr',null,['Mês','Previsto','Recebido','Despesa','Saldo Prev.','Saldo Real',''].map((h,i)=>React.createElement('th',{key:i,style:S.th},h)))
         ),
         React.createElement('tbody',null,
           fluxo.map(m=>React.createElement(Fragment,{key:m.mes},
@@ -432,7 +459,7 @@ function FluxoCaixa({fluxo,data,upd}){
               React.createElement('td',{style:{...S.td,color:m.dPrev>0?'#92400E':'#A8A29E'}},brl(m.dPrev)),
               React.createElement('td',{style:S.td},brl(m.saldoPrev)),
               React.createElement('td',{style:{...S.td,color:m.saldoReal>0?'#065F46':m.rec===0?'#A8A29E':'#DC2626'}},brl(m.saldoReal)),
-              React.createElement('td',{style:S.td},React.createElement('button',{onClick:()=>setExp(exp===m.mes?null:m.mes),style:{background:'none',border:'none',cursor:'pointer',color:'#78716C',fontSize:16,lineHeight:1}},exp===m.mes?'−':'+'))
+              React.createElement('td',{style:S.td},React.createElement('button',{onClick:()=>setExp(exp===m.mes?null:m.mes),style:{background:'none',border:'none',cursor:'pointer',color:'#78716C',fontSize:16}},exp===m.mes?'−':'+'))
             ),
             exp===m.mes&&React.createElement('tr',null,
               React.createElement('td',{colSpan:7,style:{padding:'0 14px 14px 28px',background:'#FAFAF8'}},
@@ -444,21 +471,7 @@ function FluxoCaixa({fluxo,data,upd}){
       )
     ),
     React.createElement(ChCard,{title:'Saldo Acumulado no Ano'},
-      React.createElement(ResponsiveContainer,{width:'100%',height:170},
-        React.createElement(AreaChart,{data:acum},
-          React.createElement('defs',null,
-            React.createElement('linearGradient',{id:'grad',x1:'0',y1:'0',x2:'0',y2:'1'},
-              React.createElement('stop',{offset:'5%',stopColor:'#A67C52',stopOpacity:0.15}),
-              React.createElement('stop',{offset:'95%',stopColor:'#A67C52',stopOpacity:0})
-            )
-          ),
-          React.createElement(CartesianGrid,{strokeDasharray:'2 4',vertical:false,stroke:'#F0EDE8'}),
-          React.createElement(XAxis,{dataKey:'nome',tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false}),
-          React.createElement(YAxis,{tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false,tickFormatter:v=>`R$${(v/1000).toFixed(0)}k`}),
-          React.createElement(Tooltip,{formatter:v=>brl(v),contentStyle:ttStyle}),
-          React.createElement(Area,{type:'monotone',dataKey:'acum',stroke:'#A67C52',fill:'url(#grad)',strokeWidth:2})
-        )
-      )
+      React.createElement(AreaChart,{data:acum,dataKey:'acum'})
     )
   );
 }
@@ -531,16 +544,7 @@ function Metricas({data,fluxo,mrr,ano}){
       )
     ),
     React.createElement(ChCard,{title:'Recorrente × Projeto – Mês a Mês'},
-      React.createElement(ResponsiveContainer,{width:'100%',height:210},
-        React.createElement(BarChart,{data:porTipo,barGap:3,barCategoryGap:'35%'},
-          React.createElement(CartesianGrid,{strokeDasharray:'2 4',vertical:false,stroke:'#F0EDE8'}),
-          React.createElement(XAxis,{dataKey:'nome',tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false}),
-          React.createElement(YAxis,{tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false,tickFormatter:v=>`R$${(v/1000).toFixed(0)}k`}),
-          React.createElement(Tooltip,{formatter:v=>brl(v),contentStyle:ttStyle}),
-          React.createElement(Bar,{dataKey:'r',name:'Recorrente',fill:'#A67C52',radius:[3,3,0,0],stackId:'a'}),
-          React.createElement(Bar,{dataKey:'p',name:'Projeto',fill:'#3B3A38',radius:[3,3,0,0],stackId:'a'})
-        )
-      ),
+      React.createElement(StackedBarChart,{data:porTipo,keys:['r','p'],colors:['#A67C52','#3B3A38'],labels:['Recorrente','Projeto']}),
       React.createElement('div',{style:{display:'flex',gap:16,marginTop:10}},
         React.createElement(Leg,{cor:'#A67C52',label:'Recorrente (Gestão Révem)'}),
         React.createElement(Leg,{cor:'#3B3A38',label:'Projeto (Operarte etc)'})
@@ -549,27 +553,16 @@ function Metricas({data,fluxo,mrr,ano}){
   );
 }
 
-// ── APP ROOT ─────────────────────────────────────────────────────────────────
+// ── APP ───────────────────────────────────────────────────────────────────────
 function App(){
   const [data,setData]=useState(null);
-  const [status,setStatus]=useState('Conectando ao Firebase...');
+  const [status,setStatus]=useState('Conectando...');
   const [tab,setTab]=useState('dashboard');
   const [ano,setAno]=useState(ANO);
 
-  useEffect(()=>{
-    loadFromFirebase()
-      .then(d=>{ setData(d); setStatus(''); })
-      .catch(()=>setStatus('Erro ao conectar. Verifique sua conexão.'));
-  },[]);
+  useEffect(()=>{ loadFromFB().then(d=>{ setData(d); setStatus(''); }).catch(()=>setStatus('Erro ao conectar com Firebase.')); },[]);
 
-  const upd=useCallback(fn=>setData(p=>{
-    const next=fn(p);
-    saveToFirebase(next);
-    return next;
-  }),[]);
-
-  const handleExport=()=>{ if(data) exportarJSON(data); };
-  const handleImport=(e)=>{ const f=e.target.files[0]; if(f) importarJSON(f,d=>setData(d)); e.target.value=''; };
+  const upd=useCallback(fn=>setData(p=>{ const next=fn(p); saveToFB(next); return next; }),[]);
 
   const fluxo=useMemo(()=>data?buildFluxo(data.contratos,data.despesas,data.conf,data.despReal,ano):[],[data,ano]);
   const mrr=useMemo(()=>data?calcMRR(data.contratos):0,[data]);
@@ -583,21 +576,14 @@ function App(){
     return Object.entries(mp).map(([n,v])=>({n,v}));
   },[data,ano]);
 
-  const TABS=[
-    {id:'dashboard',l:'Dashboard'},
-    {id:'contratos',l:'Contratos'},
-    {id:'despesas',l:'Despesas'},
-    {id:'fluxo',l:'Fluxo de Caixa'},
-    {id:'metricas',l:'Métricas'},
-  ];
-  const TAB_NAMES={dashboard:'Dashboard',contratos:'Contratos',despesas:'Despesas',fluxo:'Fluxo de Caixa',metricas:'Métricas'};
+  const TABS=[{id:'dashboard',l:'Dashboard'},{id:'contratos',l:'Contratos'},{id:'despesas',l:'Despesas'},{id:'fluxo',l:'Fluxo de Caixa'},{id:'metricas',l:'Métricas'}];
+  const TN={dashboard:'Dashboard',contratos:'Contratos',despesas:'Despesas',fluxo:'Fluxo de Caixa',metricas:'Métricas'};
 
-  if(status) return React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#F7F5F0',fontFamily:"'DM Sans',sans-serif",fontSize:14,color:'#78716C'}},status);
+  if(status) return React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#F7F5F0',fontSize:14,color:'#78716C'}},status);
   if(!data) return null;
 
-  return React.createElement('div',{style:{display:'flex',minHeight:'100vh',background:'#F7F5F0',fontFamily:"'DM Sans',sans-serif"}},
-    // SIDEBAR
-    React.createElement('aside',{style:{width:210,background:'#1C1917',display:'flex',flexDirection:'column',padding:'26px 0',flexShrink:0,position:'sticky',top:0,height:'100vh'}},
+  return React.createElement('div',{style:{display:'flex',minHeight:'100vh',background:'#F7F5F0'}},
+    React.createElement('aside',{style:{width:210,background:'#1C1917',display:'flex',flexDirection:'column',padding:'26px 0',flexShrink:0,position:'sticky',top:0,height:'100vh',overflowY:'auto'}},
       React.createElement('div',{style:{padding:'0 18px',marginBottom:28}},
         React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:'#F7F5F0',fontWeight:600,letterSpacing:'0.02em'}},'Révem'),
         React.createElement('div',{style:{fontSize:10,color:'#57534E',letterSpacing:'0.15em',textTransform:'uppercase',marginTop:2}},'Sistema Financeiro')
@@ -605,24 +591,21 @@ function App(){
       React.createElement('nav',{style:{flex:1}},
         TABS.map(t=>React.createElement('button',{key:t.id,onClick:()=>setTab(t.id),style:{display:'flex',alignItems:'center',width:'100%',padding:'10px 18px',background:tab===t.id?'rgba(247,245,240,0.07)':'transparent',border:'none',borderLeft:tab===t.id?'2px solid #A67C52':'2px solid transparent',color:tab===t.id?'#F7F5F0':'#78716C',fontSize:13,cursor:'pointer',textAlign:'left',fontFamily:"'DM Sans',sans-serif"}},t.l))
       ),
-      // MRR
       React.createElement('div',{style:{padding:'16px 18px',borderTop:'1px solid rgba(255,255,255,0.06)',borderBottom:'1px solid rgba(255,255,255,0.06)',marginBottom:8}},
         React.createElement('div',{style:{fontSize:10,color:'#57534E',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:4}},'MRR Atual'),
         React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:21,color:'#A67C52',fontWeight:600}},brl(mrr))
       ),
-      // Backup buttons
       React.createElement('div',{style:{padding:'12px 18px',display:'flex',flexDirection:'column',gap:6}},
-        React.createElement('button',{onClick:handleExport,style:{background:'transparent',color:'#57534E',border:'1px solid #2C2C2A',borderRadius:6,padding:'6px 10px',fontSize:11,cursor:'pointer',textAlign:'left',fontFamily:"'DM Sans',sans-serif"}},'↓ Exportar backup'),
+        React.createElement('button',{onClick:()=>exportarJSON(data),style:{background:'transparent',color:'#57534E',border:'1px solid #2C2C2A',borderRadius:6,padding:'6px 10px',fontSize:11,cursor:'pointer',textAlign:'left',fontFamily:"'DM Sans',sans-serif"}},'↓ Exportar backup'),
         React.createElement('label',{style:{background:'transparent',color:'#57534E',border:'1px solid #2C2C2A',borderRadius:6,padding:'6px 10px',fontSize:11,cursor:'pointer',display:'block'}},
           '↑ Importar backup',
-          React.createElement('input',{type:'file',accept:'.json',onChange:handleImport,style:{display:'none'}})
+          React.createElement('input',{type:'file',accept:'.json',onChange:e=>{ const f=e.target.files[0]; if(f) importarJSON(f,d=>setData(d)); e.target.value=''; },style:{display:'none'}})
         )
       )
     ),
-    // MAIN
     React.createElement('main',{style:{flex:1,padding:'28px 32px',minWidth:0,overflowY:'auto'}},
       React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}},
-        React.createElement('h1',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:600,color:'#1C1917',margin:0}},TAB_NAMES[tab]),
+        React.createElement('h1',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:600,color:'#1C1917',margin:0}},TN[tab]),
         React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
           React.createElement('button',{onClick:()=>setAno(a=>a-1),style:S.sec},'‹'),
           React.createElement('span',{style:{fontSize:14,fontWeight:500,color:'#1C1917',minWidth:44,textAlign:'center'}},ano),
