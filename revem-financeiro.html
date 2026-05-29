@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Révem – Sistema Financeiro</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#F7F5F0;color:#1C1917}
+input,select,button{font-family:'DM Sans',sans-serif}
+input[type=month],input[type=number],input[type=text],select{-webkit-appearance:none;appearance:none}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#D4C8B8;border-radius:3px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
+
+<script>
+// ── FIREBASE CONFIG ──────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyA0MUhrlIjwZD3NeSxmoC6zehKGdv1j3yc",
+  authDomain: "revem-financeiro.firebaseapp.com",
+  databaseURL: "https://revem-financeiro-default-rtdb.firebaseio.com",
+  projectId: "revem-financeiro",
+  storageBucket: "revem-financeiro.firebasestorage.app",
+  messagingSenderId: "965762837378",
+  appId: "1:965762837378:web:2466a72e7fb7bbbaa97d9b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const DB_REF = '/revem_fin';
+
+// ── REACT + RECHARTS ─────────────────────────────────────────────────────────
+const { useState, useEffect, useCallback, useMemo, Fragment } = React;
+const { BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
+        XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = Recharts;
+
+// ── CONSTANTS ────────────────────────────────────────────────────────────────
+const MC = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const ANO = new Date().getFullYear();
+const SERVICOS = ['Gestão Révem','Operarte','Olhar Révem','Atendimento','Retrato do Negócio','Outro'];
+const CATS = ['CAC – Marketing e Vendas','CoS – Entrega','Backoffice – Administrativo','Impostos e Taxas','Pró-labore','Outro'];
+const CORES = ['#A67C52','#3B3A38','#78716C','#C4A882','#8C7355','#D4C8B8'];
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+const gid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+const mesNow = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+const addM = (k,n) => { const [y,m]=k.split('-').map(Number); const d=new Date(y,m-1+n,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+const midx = k => parseInt(k.split('-')[1])-1;
+const brl = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);
+const mesAno = (a=ANO) => Array.from({length:12},(_,i)=>`${a}-${String(i+1).padStart(2,'0')}`);
+const empty = () => ({ contratos:[], despesas:[], conf:{}, despReal:{} });
+
+// ── FIREBASE STORAGE ─────────────────────────────────────────────────────────
+let saveTimer = null;
+const saveToFirebase = (data) => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    db.ref(DB_REF).set(data).catch(e => console.error('Firebase save error:', e));
+  }, 800);
+};
+
+const loadFromFirebase = () => {
+  return db.ref(DB_REF).get().then(snap => snap.val() || empty());
+};
+
+// ── BACKUP EXPORT / IMPORT ───────────────────────────────────────────────────
+const exportarJSON = (data) => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `revem-financeiro-backup-${mesNow()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const importarJSON = (file, onSuccess) => {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      db.ref(DB_REF).set(data).then(() => onSuccess(data));
+    } catch(err) {
+      alert('Arquivo inválido. Use um backup gerado por este sistema.');
+    }
+  };
+  reader.readAsText(file);
+};
+
+// ── BUSINESS LOGIC ────────────────────────────────────────────────────────────
+const gParcelas = c => {
+  if(!c || c.status !== 'ativo') return [];
+  const ps = [];
+  if(c.recorrente){
+    let m = c.mesInicio, fim = `${ANO+1}-12`;
+    while(m <= fim){ if(!c.mesCancel || m <= c.mesCancel) ps.push({mes:m, valor:c.valorMensal}); m = addM(m,1); }
+  } else {
+    for(let i=0;i<c.numParcelas;i++) ps.push({mes:addM(c.mesInicio,i), valor:c.valorParcela});
+  }
+  return ps;
+};
+
+const gExp = d => {
+  if(!d.ativo) return [];
+  if(!d.recorrente) return [{mes:d.mesInicio, valor:d.valor}];
+  const es=[]; let m=d.mesInicio, fim=`${ANO+1}-12`;
+  while(m<=fim){ es.push({mes:m, valor:d.valor}); m=addM(m,1); }
+  return d.mesFim ? es.filter(e=>e.mes<=d.mesFim) : es;
+};
+
+const buildFluxo = (contratos, despesas, conf, despReal, ano=ANO) =>
+  mesAno(ano).map(mes => {
+    let prev=0, rec=0, dPrev=0, dReal=0;
+    contratos.forEach(c => {
+      const p = gParcelas(c).find(x=>x.mes===mes);
+      if(p){ prev+=p.valor; const k=`${c.id}_${mes}`; if(conf[k]?.ok) rec+=conf[k].valor??p.valor; }
+    });
+    despesas.forEach(d => {
+      const e = gExp(d).find(x=>x.mes===mes);
+      if(e){ dPrev+=e.valor; const k=`${d.id}_${mes}`; if(despReal[k]?.ok) dReal+=despReal[k].valor??e.valor; }
+    });
+    return {mes, nome:MC[midx(mes)], prev, rec, dPrev, dReal, saldoPrev:prev-dPrev, saldoReal:rec-dReal};
+  });
+
+const calcMRR = contratos => {
+  const m = mesNow();
+  return contratos
+    .filter(c=>c.recorrente&&c.status==='ativo'&&c.mesInicio<=m&&(!c.mesCancel||c.mesCancel>=m))
+    .reduce((s,c)=>s+c.valorMensal, 0);
+};
+
+// ── STYLES ───────────────────────────────────────────────────────────────────
+const S = {
+  prim:{background:'#1C1917',color:'#F7F5F0',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6,fontWeight:500},
+  sec:{background:'transparent',color:'#78716C',border:'1px solid #D4C8B8',borderRadius:8,padding:'7px 14px',fontSize:13,cursor:'pointer'},
+  danger:{background:'transparent',color:'#B45309',border:'1px solid #F59E0B',borderRadius:8,padding:'7px 14px',fontSize:13,cursor:'pointer'},
+  inp:{width:'100%',padding:'8px 11px',border:'1px solid #D4C8B8',borderRadius:8,fontSize:13,color:'#1C1917',background:'#FAFAF8',outline:'none',fontFamily:"'DM Sans',sans-serif"},
+  card:{background:'#fff',border:'1px solid #E7E5E0',borderRadius:12,padding:'18px 20px'},
+  chart:{background:'#fff',border:'1px solid #E7E5E0',borderRadius:12,padding:'20px 22px',marginBottom:14},
+  th:{padding:'10px 14px',textAlign:'left',fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:500,whiteSpace:'nowrap',background:'#F7F5F0'},
+  td:{padding:'11px 14px',fontSize:13,color:'#1C1917'},
+};
+
+// ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
+const FLD = ({label,children}) => React.createElement('div',null,
+  React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:5}},label),
+  children
+);
+const Chip = ({children,muted}) => React.createElement('span',{
+  style:{fontSize:11,background:'#F7F5F0',padding:'2px 8px',borderRadius:12,color:muted?'#A8A29E':'#78716C'}
+},children);
+const Empty = ({msg}) => React.createElement('div',{
+  style:{textAlign:'center',padding:'40px 0',color:'#A8A29E',fontSize:13}
+},msg);
+const GrpLbl = ({label,mt}) => React.createElement('div',{
+  style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8,marginTop:mt||0}
+},label);
+const Leg = ({cor,label}) => React.createElement('div',{
+  style:{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#78716C'}
+},React.createElement('span',{style:{width:12,height:8,background:cor,borderRadius:2,display:'inline-block'}}),label);
+const ChCard = ({title,children}) => React.createElement('div',{style:S.chart},
+  React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:16}},title),
+  children
+);
+const ttStyle = {border:'1px solid #E7E5E0',borderRadius:8,fontSize:12,background:'#fff'};
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function Dashboard({fluxo,mrr,fma,totalPrev,porServico}){
+  const cards=[
+    {l:'MRR',v:brl(mrr),s:'Receita recorrente mensal',dark:true},
+    {l:'Previsto – Mês',v:brl(fma.prev||0),s:'Contratos do mês'},
+    {l:'Recebido – Mês',v:brl(fma.rec||0),s:'Confirmados no mês'},
+    {l:'Previsto – Ano',v:brl(totalPrev),s:'Projeção anual total'},
+  ];
+  return React.createElement('div',null,
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:20}},
+      cards.map((c,i)=>React.createElement('div',{key:i,style:{...S.card,background:c.dark?'#1C1917':'#fff',borderColor:c.dark?'#1C1917':'#E7E5E0'}},
+        React.createElement('div',{style:{fontSize:11,color:c.dark?'#57534E':'#78716C',textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:8}},c.l),
+        React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:600,color:c.dark?'#A67C52':'#1C1917',lineHeight:1}},c.v),
+        React.createElement('div',{style:{fontSize:11,color:c.dark?'#44403C':'#A8A29E',marginTop:6}},c.s)
+      ))
+    ),
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'3fr 2fr',gap:12}},
+      React.createElement(ChCard,{title:'Receita Mensal'},
+        React.createElement(ResponsiveContainer,{width:'100%',height:200},
+          React.createElement(BarChart,{data:fluxo,barGap:3,barCategoryGap:'35%'},
+            React.createElement(CartesianGrid,{strokeDasharray:'2 4',vertical:false,stroke:'#F0EDE8'}),
+            React.createElement(XAxis,{dataKey:'nome',tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false}),
+            React.createElement(YAxis,{tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false,tickFormatter:v=>`R$${(v/1000).toFixed(0)}k`}),
+            React.createElement(Tooltip,{formatter:v=>brl(v),contentStyle:ttStyle}),
+            React.createElement(Bar,{dataKey:'prev',name:'Previsto',fill:'#E7E5E0',radius:[3,3,0,0]}),
+            React.createElement(Bar,{dataKey:'rec',name:'Recebido',fill:'#A67C52',radius:[3,3,0,0]})
+          )
+        ),
+        React.createElement('div',{style:{display:'flex',gap:16,marginTop:10}},
+          React.createElement(Leg,{cor:'#E7E5E0',label:'Previsto'}),
+          React.createElement(Leg,{cor:'#A67C52',label:'Recebido'})
+        )
+      ),
+      React.createElement(ChCard,{title:'Por Serviço'},
+        porServico.length===0
+          ? React.createElement(Empty,{msg:'Sem contratos no ano'})
+          : React.createElement('div',null,
+              React.createElement(ResponsiveContainer,{width:'100%',height:150},
+                React.createElement(PieChart,null,
+                  React.createElement(Pie,{data:porServico,cx:'50%',cy:'50%',innerRadius:42,outerRadius:65,dataKey:'v',paddingAngle:2},
+                    porServico.map((_,i)=>React.createElement(Cell,{key:i,fill:CORES[i%CORES.length]}))
+                  ),
+                  React.createElement(Tooltip,{formatter:v=>brl(v),contentStyle:ttStyle})
+                )
+              ),
+              porServico.map((s,i)=>React.createElement('div',{key:i,style:{display:'flex',justifyContent:'space-between',fontSize:12,padding:'5px 0',borderTop:'1px solid #F0EDE8'}},
+                React.createElement('div',{style:{display:'flex',gap:6,alignItems:'center',color:'#78716C'}},
+                  React.createElement('span',{style:{width:8,height:8,borderRadius:'50%',background:CORES[i%CORES.length],flexShrink:0}}),s.n
+                ),
+                React.createElement('span',{style:{color:'#1C1917',fontWeight:500}},brl(s.v))
+              ))
+            )
+      )
+    )
+  );
+}
+
+// ── CONTRATOS ────────────────────────────────────────────────────────────────
+function Contratos({data,upd}){
+  const [show,setShow]=useState(false);
+  const [editId,setEditId]=useState(null);
+  const df=()=>({cliente:'',servico:'Gestão Révem',recorrente:true,valorMensal:'',valorTotal:'',numParcelas:1,valorParcela:'',mesInicio:mesNow(),forma:'Pix',obs:''});
+  const [form,setForm]=useState(df());
+  const set=(k,v)=>setForm(p=>({...p,[k]:v}));
+
+  const abrir=(c=null)=>{ setForm(c?{...c,valorMensal:String(c.valorMensal||''),valorTotal:String(c.valorTotal||''),valorParcela:String(c.valorParcela||''),numParcelas:c.numParcelas||1}:df()); setEditId(c?.id||null); setShow(true); };
+  const salvar=()=>{
+    if(!form.cliente) return;
+    const vm=parseFloat(form.valorMensal)||0, vt=parseFloat(form.valorTotal)||0, np=parseInt(form.numParcelas)||1;
+    const vp=form.recorrente?vm:(vt/np);
+    const c={...form,id:editId||gid(),valorMensal:vm,valorTotal:vt,numParcelas:np,valorParcela:vp,status:'ativo'};
+    upd(p=>({...p,contratos:editId?p.contratos.map(x=>x.id===editId?c:x):[...p.contratos,c]}));
+    setShow(false);
+  };
+  const enc=id=>upd(p=>({...p,contratos:p.contratos.map(c=>c.id===id?{...c,status:'encerrado',mesCancel:mesNow()}:c)}));
+  const del=id=>{ if(confirm('Excluir este contrato?')) upd(p=>({...p,contratos:p.contratos.filter(c=>c.id!==id)})); };
+
+  const ativos=data.contratos.filter(c=>c.status==='ativo');
+  const encerrados=data.contratos.filter(c=>c.status!=='ativo');
+  const vParcela=(parseFloat(form.valorTotal)||0)/(parseInt(form.numParcelas)||1);
+
+  return React.createElement('div',null,
+    React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}},
+      React.createElement('span',{style:{fontSize:13,color:'#78716C'}},`${ativos.length} ativo${ativos.length!==1?'s':''}`),
+      React.createElement('button',{onClick:()=>abrir(),style:S.prim},'+ Novo Contrato')
+    ),
+    show&&React.createElement('div',{style:{...S.card,border:'1px solid #A67C52',marginBottom:18}},
+      React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:600,color:'#1C1917',marginBottom:18}},editId?'Editar Contrato':'Novo Contrato'),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}},
+        React.createElement(FLD,{label:'Cliente'},React.createElement('input',{style:S.inp,value:form.cliente,onChange:e=>set('cliente',e.target.value),placeholder:'Nome da fotógrafa'})),
+        React.createElement(FLD,{label:'Serviço'},React.createElement('select',{style:S.inp,value:form.servico,onChange:e=>{set('servico',e.target.value);set('recorrente',e.target.value==='Gestão Révem');}},SERVICOS.map(s=>React.createElement('option',{key:s},s))))
+      ),
+      React.createElement('div',{style:{marginBottom:12}},
+        React.createElement(FLD,{label:'Tipo'},
+          React.createElement('div',{style:{display:'flex',gap:24,paddingTop:4}},
+            [{v:true,l:'Recorrente (mensal)'},{v:false,l:'Projeto (parcelas fixas)'}].map(t=>
+              React.createElement('label',{key:String(t.v),style:{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#1C1917',cursor:'pointer'}},
+                React.createElement('input',{type:'radio',checked:form.recorrente===t.v,onChange:()=>set('recorrente',t.v)}),t.l
+              )
+            )
+          )
+        )
+      ),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}},
+        form.recorrente
+          ?React.createElement(FLD,{label:'Valor Mensal (R$)'},React.createElement('input',{style:S.inp,type:'number',value:form.valorMensal,onChange:e=>set('valorMensal',e.target.value),placeholder:'0,00'}))
+          :React.createElement(Fragment,null,
+              React.createElement(FLD,{label:'Valor Total (R$)'},React.createElement('input',{style:S.inp,type:'number',value:form.valorTotal,onChange:e=>{const v=parseFloat(e.target.value)||0;setForm(p=>({...p,valorTotal:e.target.value,valorParcela:String((v/(p.numParcelas||1)).toFixed(2))}));},placeholder:'0,00'})),
+              React.createElement(FLD,{label:'Parcelas'},React.createElement('input',{style:S.inp,type:'number',value:form.numParcelas,min:1,onChange:e=>{const n=parseInt(e.target.value)||1;setForm(p=>({...p,numParcelas:n,valorParcela:String(((parseFloat(p.valorTotal)||0)/n).toFixed(2))}));}}))
+            ),
+        React.createElement(FLD,{label:'Mês de Início'},React.createElement('input',{style:S.inp,type:'month',value:form.mesInicio,onChange:e=>set('mesInicio',e.target.value)}))
+      ),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}},
+        React.createElement(FLD,{label:'Pagamento'},React.createElement('select',{style:S.inp,value:form.forma,onChange:e=>set('forma',e.target.value)},['Pix','Cartão','Boleto','Transferência'].map(f=>React.createElement('option',{key:f},f)))),
+        React.createElement(FLD,{label:'Observação'},React.createElement('input',{style:S.inp,value:form.obs,onChange:e=>set('obs',e.target.value),placeholder:'Ex: 3 ciclos Operarte...'}))
+      ),
+      !form.recorrente&&parseFloat(form.valorTotal)>0&&form.numParcelas>1&&React.createElement('div',{style:{background:'#F7F5F0',borderRadius:8,padding:'10px 14px',fontSize:12,color:'#78716C',marginBottom:12}},
+        `→ ${form.numParcelas}× de ${brl(vParcela)} a partir de ${form.mesInicio}`
+      ),
+      React.createElement('div',{style:{display:'flex',gap:10,justifyContent:'flex-end'}},
+        React.createElement('button',{onClick:()=>setShow(false),style:S.sec},'Cancelar'),
+        React.createElement('button',{onClick:salvar,style:S.prim},'Salvar')
+      )
+    ),
+    data.contratos.length===0&&!show&&React.createElement(Empty,{msg:'Nenhum contrato cadastrado. Comece adicionando seus contratos ativos.'}),
+    ativos.length>0&&React.createElement('div',null,
+      React.createElement(GrpLbl,{label:'Ativos'}),
+      ativos.map(c=>React.createElement(CRow,{key:c.id,c,onEdit:()=>abrir(c),onEnc:()=>enc(c.id),onDel:()=>del(c.id)}))
+    ),
+    encerrados.length>0&&React.createElement('div',{style:{marginTop:22,opacity:0.55}},
+      React.createElement(GrpLbl,{label:'Encerrados'}),
+      encerrados.map(c=>React.createElement(CRow,{key:c.id,c,onDel:()=>del(c.id),enc:true}))
+    )
+  );
+}
+
+function CRow({c,onEdit,onEnc,onDel,enc}){
+  return React.createElement('div',{style:{...S.card,display:'flex',alignItems:'center',gap:14,marginBottom:6,padding:'14px 18px'}},
+    React.createElement('div',{style:{width:7,height:7,borderRadius:'50%',background:enc?'#D4C8B8':'#A67C52',flexShrink:0}}),
+    React.createElement('div',{style:{flex:1,minWidth:0}},
+      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap'}},
+        React.createElement('span',{style:{fontSize:14,fontWeight:500,color:'#1C1917'}},c.cliente),
+        React.createElement(Chip,null,c.servico),
+        c.recorrente&&React.createElement(Chip,{muted:true},'recorrente'),
+        React.createElement(Chip,{muted:true},c.forma)
+      ),
+      React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:3}},`Início: ${c.mesInicio}${c.obs?' · '+c.obs:''}`)
+    ),
+    React.createElement('div',{style:{textAlign:'right',flexShrink:0}},
+      React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:600,color:'#1C1917'}},
+        c.recorrente?`${brl(c.valorMensal)}/mês`:brl(c.valorTotal)
+      ),
+      !c.recorrente&&c.numParcelas>1&&React.createElement('div',{style:{fontSize:11,color:'#A8A29E'}},`${c.numParcelas}× ${brl(c.valorParcela)}`)
+    ),
+    !enc&&React.createElement('div',{style:{display:'flex',gap:6,flexShrink:0}},
+      React.createElement('button',{onClick:onEdit,style:{...S.sec,fontSize:12,padding:'4px 12px'}},'Editar'),
+      React.createElement('button',{onClick:onEnc,style:{...S.danger,fontSize:12,padding:'4px 12px'}},'Encerrar')
+    ),
+    enc&&React.createElement('button',{onClick:onDel,style:{...S.sec,fontSize:12,padding:'4px 12px',flexShrink:0}},'Excluir')
+  );
+}
+
+// ── DESPESAS ─────────────────────────────────────────────────────────────────
+function Despesas({data,upd}){
+  const [show,setShow]=useState(false);
+  const [editId,setEditId]=useState(null);
+  const df=()=>({descricao:'',categoria:CATS[2],valor:'',recorrente:true,mesInicio:mesNow(),ativo:true});
+  const [form,setForm]=useState(df());
+  const set=(k,v)=>setForm(p=>({...p,[k]:v}));
+
+  const abrir=(d=null)=>{ setForm(d?{...d,valor:String(d.valor)}:df()); setEditId(d?.id||null); setShow(true); };
+  const salvar=()=>{ if(!form.descricao||!form.valor) return; const d={...form,id:editId||gid(),valor:parseFloat(form.valor)||0}; upd(p=>({...p,despesas:editId?p.despesas.map(x=>x.id===editId?d:x):[...p.despesas,d]})); setShow(false); };
+  const tog=id=>upd(p=>({...p,despesas:p.despesas.map(d=>d.id===id?{...d,ativo:!d.ativo}:d)}));
+  const del=id=>{ if(confirm('Excluir esta despesa?')) upd(p=>({...p,despesas:p.despesas.filter(d=>d.id!==id)})); };
+
+  const ativas=data.despesas.filter(d=>d.ativo);
+  const totalFix=ativas.filter(d=>d.recorrente).reduce((s,d)=>s+d.valor,0);
+
+  return React.createElement('div',null,
+    React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}},
+      React.createElement('span',{style:{fontSize:13,color:'#78716C'}},['Custo fixo mensal: ',React.createElement('strong',{key:'v',style:{color:'#1C1917'}},brl(totalFix))]),
+      React.createElement('button',{onClick:()=>abrir(),style:S.prim},'+ Nova Despesa')
+    ),
+    show&&React.createElement('div',{style:{...S.card,border:'1px solid #A67C52',marginBottom:18}},
+      React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:600,color:'#1C1917',marginBottom:18}},editId?'Editar Despesa':'Nova Despesa'),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:12,marginBottom:12}},
+        React.createElement(FLD,{label:'Descrição'},React.createElement('input',{style:S.inp,value:form.descricao,onChange:e=>set('descricao',e.target.value),placeholder:'Ex: Notion, Google Workspace, freelancer...'})),
+        React.createElement(FLD,{label:'Valor (R$)'},React.createElement('input',{style:S.inp,type:'number',value:form.valor,onChange:e=>set('valor',e.target.value),placeholder:'0,00'}))
+      ),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}},
+        React.createElement(FLD,{label:'Categoria'},React.createElement('select',{style:S.inp,value:form.categoria,onChange:e=>set('categoria',e.target.value)},CATS.map(c=>React.createElement('option',{key:c},c)))),
+        React.createElement(FLD,{label:'Recorrência'},React.createElement('select',{style:S.inp,value:form.recorrente?'sim':'nao',onChange:e=>set('recorrente',e.target.value==='sim')},React.createElement('option',{value:'sim'},'Mensal'),React.createElement('option',{value:'nao'},'Uma vez'))),
+        React.createElement(FLD,{label:'Mês de Início'},React.createElement('input',{style:S.inp,type:'month',value:form.mesInicio,onChange:e=>set('mesInicio',e.target.value)}))
+      ),
+      React.createElement('div',{style:{display:'flex',gap:10,justifyContent:'flex-end'}},
+        React.createElement('button',{onClick:()=>setShow(false),style:S.sec},'Cancelar'),
+        React.createElement('button',{onClick:salvar,style:S.prim},'Salvar')
+      )
+    ),
+    data.despesas.length===0&&!show&&React.createElement(Empty,{msg:'Nenhuma despesa cadastrada ainda.'}),
+    CATS.map(cat=>{
+      const itens=ativas.filter(d=>d.categoria===cat);
+      if(!itens.length) return null;
+      return React.createElement('div',{key:cat,style:{marginBottom:18}},
+        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:8}},
+          React.createElement('span',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em'}},cat),
+          React.createElement('span',{style:{fontSize:12,color:'#78716C'}},brl(itens.reduce((s,d)=>s+d.valor,0)))
+        ),
+        itens.map(d=>React.createElement('div',{key:d.id,style:{...S.card,display:'flex',alignItems:'center',gap:12,marginBottom:5,padding:'11px 16px'}},
+          React.createElement('div',{style:{flex:1,fontSize:13,color:'#1C1917'}},d.descricao,' ',React.createElement('span',{style:{color:'#A8A29E',fontSize:12}},d.recorrente?'· mensal':`· ${d.mesInicio}`)),
+          React.createElement('span',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:17,fontWeight:600,color:'#1C1917'}},brl(d.valor)),
+          React.createElement('div',{style:{display:'flex',gap:6}},
+            React.createElement('button',{onClick:()=>abrir(d),style:{...S.sec,fontSize:12,padding:'3px 10px'}},'Editar'),
+            React.createElement('button',{onClick:()=>tog(d.id),style:{...S.sec,fontSize:12,padding:'3px 10px'}},'Pausar'),
+            React.createElement('button',{onClick:()=>del(d.id),style:{...S.sec,fontSize:12,padding:'3px 10px',color:'#B45309'}},'×')
+          )
+        ))
+      );
+    }),
+    data.despesas.filter(d=>!d.ativo).length>0&&React.createElement('div',{style:{marginTop:20,opacity:0.5}},
+      React.createElement(GrpLbl,{label:'Pausadas'}),
+      data.despesas.filter(d=>!d.ativo).map(d=>React.createElement('div',{key:d.id,style:{background:'#F7F5F0',border:'1px solid #E7E5E0',borderRadius:8,padding:'10px 16px',display:'flex',alignItems:'center',gap:12,marginBottom:5}},
+        React.createElement('span',{style:{flex:1,fontSize:13,color:'#78716C'}},d.descricao),
+        React.createElement('span',{style:{fontSize:13,color:'#78716C'}},brl(d.valor)),
+        React.createElement('button',{onClick:()=>tog(d.id),style:{...S.sec,fontSize:12,padding:'3px 10px'}},'Reativar'),
+        React.createElement('button',{onClick:()=>del(d.id),style:{...S.sec,fontSize:12,padding:'3px 10px',color:'#B45309'}},'×')
+      ))
+    )
+  );
+}
+
+// ── FLUXO DE CAIXA ────────────────────────────────────────────────────────────
+function FluxoCaixa({fluxo,data,upd}){
+  const [exp,setExp]=useState(null);
+  const ma=mesNow();
+  const conf=(cId,mes,valor)=>{ const k=`${cId}_${mes}`; upd(p=>({...p,conf:{...p.conf,[k]:{ok:true,valor:parseFloat(valor)||0}}})); };
+  const desconf=(cId,mes)=>{ upd(p=>{const c={...p.conf};delete c[`${cId}_${mes}`];return{...p,conf:c};}); };
+  const acum=fluxo.reduce((acc,m,i)=>[...acc,{...m,acum:(i>0?acc[i-1].acum:0)+m.saldoReal}],[]);
+
+  return React.createElement('div',null,
+    React.createElement('div',{style:{background:'#fff',border:'1px solid #E7E5E0',borderRadius:12,overflow:'hidden',marginBottom:16}},
+      React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
+        React.createElement('thead',null,
+          React.createElement('tr',null,
+            ['Mês','Previsto','Recebido','Despesa','Saldo Prev.','Saldo Real',''].map((h,i)=>React.createElement('th',{key:i,style:S.th},h))
+          )
+        ),
+        React.createElement('tbody',null,
+          fluxo.map(m=>React.createElement(Fragment,{key:m.mes},
+            React.createElement('tr',{style:{borderTop:'1px solid #F0EDE8',background:m.mes===ma?'#FFFBF5':'transparent'}},
+              React.createElement('td',{style:{...S.td,fontWeight:m.mes===ma?500:400}},m.nome,m.mes===ma&&React.createElement('span',{style:{fontSize:10,color:'#A67C52',marginLeft:6}},'atual')),
+              React.createElement('td',{style:S.td},brl(m.prev)),
+              React.createElement('td',{style:{...S.td,color:m.rec>0?'#065F46':'#A8A29E'}},brl(m.rec)),
+              React.createElement('td',{style:{...S.td,color:m.dPrev>0?'#92400E':'#A8A29E'}},brl(m.dPrev)),
+              React.createElement('td',{style:S.td},brl(m.saldoPrev)),
+              React.createElement('td',{style:{...S.td,color:m.saldoReal>0?'#065F46':m.rec===0?'#A8A29E':'#DC2626'}},brl(m.saldoReal)),
+              React.createElement('td',{style:S.td},React.createElement('button',{onClick:()=>setExp(exp===m.mes?null:m.mes),style:{background:'none',border:'none',cursor:'pointer',color:'#78716C',fontSize:16,lineHeight:1}},exp===m.mes?'−':'+'))
+            ),
+            exp===m.mes&&React.createElement('tr',null,
+              React.createElement('td',{colSpan:7,style:{padding:'0 14px 14px 28px',background:'#FAFAF8'}},
+                React.createElement(DetalhesMes,{mes:m.mes,contratos:data.contratos,conf:data.conf,onConf:conf,onDesconf:desconf})
+              )
+            )
+          ))
+        )
+      )
+    ),
+    React.createElement(ChCard,{title:'Saldo Acumulado no Ano'},
+      React.createElement(ResponsiveContainer,{width:'100%',height:170},
+        React.createElement(AreaChart,{data:acum},
+          React.createElement('defs',null,
+            React.createElement('linearGradient',{id:'grad',x1:'0',y1:'0',x2:'0',y2:'1'},
+              React.createElement('stop',{offset:'5%',stopColor:'#A67C52',stopOpacity:0.15}),
+              React.createElement('stop',{offset:'95%',stopColor:'#A67C52',stopOpacity:0})
+            )
+          ),
+          React.createElement(CartesianGrid,{strokeDasharray:'2 4',vertical:false,stroke:'#F0EDE8'}),
+          React.createElement(XAxis,{dataKey:'nome',tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false}),
+          React.createElement(YAxis,{tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false,tickFormatter:v=>`R$${(v/1000).toFixed(0)}k`}),
+          React.createElement(Tooltip,{formatter:v=>brl(v),contentStyle:ttStyle}),
+          React.createElement(Area,{type:'monotone',dataKey:'acum',stroke:'#A67C52',fill:'url(#grad)',strokeWidth:2})
+        )
+      )
+    )
+  );
+}
+
+function DetalhesMes({mes,contratos,conf,onConf,onDesconf}){
+  const itens=[];
+  contratos.forEach(c=>{ const ps=gParcelas(c).filter(p=>p.mes===mes); if(ps.length) itens.push({c,valor:ps[0].valor}); });
+  if(!itens.length) return React.createElement('div',{style:{padding:'14px 0',fontSize:13,color:'#A8A29E'}},'Nenhum recebimento previsto neste mês.');
+  return React.createElement('div',{style:{paddingTop:12}},
+    React.createElement(GrpLbl,{label:'Recebimentos previstos'}),
+    itens.map(({c,valor})=>{
+      const k=`${c.id}_${mes}`, ok=conf[k]?.ok;
+      return React.createElement('div',{key:c.id,style:{display:'flex',alignItems:'center',gap:14,padding:'8px 0',borderBottom:'1px solid #F0EDE8'}},
+        React.createElement('div',{style:{flex:1,fontSize:13}},
+          React.createElement('span',{style:{color:'#1C1917'}},c.cliente),
+          React.createElement('span',{style:{color:'#A8A29E',marginLeft:8,fontSize:12}},c.servico)
+        ),
+        React.createElement('span',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:16,fontWeight:600,color:'#1C1917'}},brl(valor)),
+        ok
+          ?React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},
+              React.createElement('span',{style:{fontSize:12,color:'#065F46',background:'#ECFDF5',padding:'2px 10px',borderRadius:12}},`✓ ${brl(conf[k].valor)}`),
+              React.createElement('button',{onClick:()=>onDesconf(c.id,mes),style:{background:'none',border:'none',cursor:'pointer',fontSize:12,color:'#A8A29E'}},'desfazer')
+            )
+          :React.createElement('button',{onClick:()=>onConf(c.id,mes,valor),style:{...S.prim,fontSize:12,padding:'5px 14px'}},'Confirmar recebimento')
+      );
+    })
+  );
+}
+
+// ── MÉTRICAS ─────────────────────────────────────────────────────────────────
+function Metricas({data,fluxo,mrr,ano}){
+  const ativos=data.contratos.filter(c=>c.status==='ativo');
+  const arr=mrr*12;
+  const tk=ativos.length?ativos.reduce((s,c)=>s+(c.recorrente?c.valorMensal:c.valorParcela||0),0)/ativos.length:0;
+  const encAno=data.contratos.filter(c=>c.status!=='ativo'&&c.mesCancel?.startsWith(String(ano))).length;
+  const recMRR=ativos.filter(c=>c.recorrente).reduce((s,c)=>s+c.valorMensal,0);
+  const recProj=ativos.filter(c=>!c.recorrente).reduce((s,c)=>s+(c.valorParcela||0),0);
+  const porTipo=fluxo.map(m=>{
+    let r=0,p=0;
+    data.contratos.forEach(c=>{ const ps=gParcelas(c).filter(x=>x.mes===m.mes); if(ps.length){ if(c.recorrente) r+=ps[0].valor; else p+=ps[0].valor; } });
+    return {...m,r,p};
+  });
+  const cs=[
+    {l:'MRR',v:brl(mrr),s:'Receita recorrente mensal',dark:true},
+    {l:'ARR',v:brl(arr),s:'Projeção anual do MRR'},
+    {l:'Ticket Médio',v:brl(tk),s:'Por contrato ativo'},
+    {l:'Clientes Ativos',v:String(ativos.length),s:`${encAno} encerrado${encAno!==1?'s':''} no ano`},
+  ];
+  return React.createElement('div',null,
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:20}},
+      cs.map((c,i)=>React.createElement('div',{key:i,style:{...S.card,background:c.dark?'#1C1917':'#fff',borderColor:c.dark?'#1C1917':'#E7E5E0'}},
+        React.createElement('div',{style:{fontSize:11,color:c.dark?'#57534E':'#78716C',textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:8}},c.l),
+        React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:600,color:c.dark?'#A67C52':'#1C1917',lineHeight:1}},c.v),
+        React.createElement('div',{style:{fontSize:11,color:c.dark?'#44403C':'#A8A29E',marginTop:6}},c.s)
+      ))
+    ),
+    React.createElement('div',{style:{...S.card,marginBottom:14}},
+      React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:14}},'Composição da Receita Mensal Atual'),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}},
+        React.createElement('div',null,
+          React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:28,fontWeight:600,color:'#A67C52'}},brl(recMRR)),
+          React.createElement('div',{style:{fontSize:12,color:'#78716C',marginTop:4}},'Recorrente (Gestão Révem)'),
+          React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:2}},`${ativos.filter(c=>c.recorrente).length} contratos ativos`)
+        ),
+        React.createElement('div',null,
+          React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:28,fontWeight:600,color:'#1C1917'}},brl(recProj)),
+          React.createElement('div',{style:{fontSize:12,color:'#78716C',marginTop:4}},'Projeto (Operarte, etc)'),
+          React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:2}},`${ativos.filter(c=>!c.recorrente).length} contratos ativos`)
+        )
+      )
+    ),
+    React.createElement(ChCard,{title:'Recorrente × Projeto – Mês a Mês'},
+      React.createElement(ResponsiveContainer,{width:'100%',height:210},
+        React.createElement(BarChart,{data:porTipo,barGap:3,barCategoryGap:'35%'},
+          React.createElement(CartesianGrid,{strokeDasharray:'2 4',vertical:false,stroke:'#F0EDE8'}),
+          React.createElement(XAxis,{dataKey:'nome',tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false}),
+          React.createElement(YAxis,{tick:{fontSize:11,fill:'#A8A29E'},axisLine:false,tickLine:false,tickFormatter:v=>`R$${(v/1000).toFixed(0)}k`}),
+          React.createElement(Tooltip,{formatter:v=>brl(v),contentStyle:ttStyle}),
+          React.createElement(Bar,{dataKey:'r',name:'Recorrente',fill:'#A67C52',radius:[3,3,0,0],stackId:'a'}),
+          React.createElement(Bar,{dataKey:'p',name:'Projeto',fill:'#3B3A38',radius:[3,3,0,0],stackId:'a'})
+        )
+      ),
+      React.createElement('div',{style:{display:'flex',gap:16,marginTop:10}},
+        React.createElement(Leg,{cor:'#A67C52',label:'Recorrente (Gestão Révem)'}),
+        React.createElement(Leg,{cor:'#3B3A38',label:'Projeto (Operarte etc)'})
+      )
+    )
+  );
+}
+
+// ── APP ROOT ─────────────────────────────────────────────────────────────────
+function App(){
+  const [data,setData]=useState(null);
+  const [status,setStatus]=useState('Conectando ao Firebase...');
+  const [tab,setTab]=useState('dashboard');
+  const [ano,setAno]=useState(ANO);
+
+  useEffect(()=>{
+    loadFromFirebase()
+      .then(d=>{ setData(d); setStatus(''); })
+      .catch(()=>setStatus('Erro ao conectar. Verifique sua conexão.'));
+  },[]);
+
+  const upd=useCallback(fn=>setData(p=>{
+    const next=fn(p);
+    saveToFirebase(next);
+    return next;
+  }),[]);
+
+  const handleExport=()=>{ if(data) exportarJSON(data); };
+  const handleImport=(e)=>{ const f=e.target.files[0]; if(f) importarJSON(f,d=>setData(d)); e.target.value=''; };
+
+  const fluxo=useMemo(()=>data?buildFluxo(data.contratos,data.despesas,data.conf,data.despReal,ano):[],[data,ano]);
+  const mrr=useMemo(()=>data?calcMRR(data.contratos):0,[data]);
+  const ma=mesNow();
+  const fma=fluxo.find(f=>f.mes===ma)||{};
+  const totalPrev=fluxo.reduce((s,m)=>s+m.prev,0);
+  const porServico=useMemo(()=>{
+    if(!data) return [];
+    const mp={};
+    data.contratos.forEach(c=>gParcelas(c).filter(p=>p.mes.startsWith(String(ano))).forEach(p=>{mp[c.servico]=(mp[c.servico]||0)+p.valor;}));
+    return Object.entries(mp).map(([n,v])=>({n,v}));
+  },[data,ano]);
+
+  const TABS=[
+    {id:'dashboard',l:'Dashboard'},
+    {id:'contratos',l:'Contratos'},
+    {id:'despesas',l:'Despesas'},
+    {id:'fluxo',l:'Fluxo de Caixa'},
+    {id:'metricas',l:'Métricas'},
+  ];
+  const TAB_NAMES={dashboard:'Dashboard',contratos:'Contratos',despesas:'Despesas',fluxo:'Fluxo de Caixa',metricas:'Métricas'};
+
+  if(status) return React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#F7F5F0',fontFamily:"'DM Sans',sans-serif",fontSize:14,color:'#78716C'}},status);
+  if(!data) return null;
+
+  return React.createElement('div',{style:{display:'flex',minHeight:'100vh',background:'#F7F5F0',fontFamily:"'DM Sans',sans-serif"}},
+    // SIDEBAR
+    React.createElement('aside',{style:{width:210,background:'#1C1917',display:'flex',flexDirection:'column',padding:'26px 0',flexShrink:0,position:'sticky',top:0,height:'100vh'}},
+      React.createElement('div',{style:{padding:'0 18px',marginBottom:28}},
+        React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:'#F7F5F0',fontWeight:600,letterSpacing:'0.02em'}},'Révem'),
+        React.createElement('div',{style:{fontSize:10,color:'#57534E',letterSpacing:'0.15em',textTransform:'uppercase',marginTop:2}},'Sistema Financeiro')
+      ),
+      React.createElement('nav',{style:{flex:1}},
+        TABS.map(t=>React.createElement('button',{key:t.id,onClick:()=>setTab(t.id),style:{display:'flex',alignItems:'center',width:'100%',padding:'10px 18px',background:tab===t.id?'rgba(247,245,240,0.07)':'transparent',border:'none',borderLeft:tab===t.id?'2px solid #A67C52':'2px solid transparent',color:tab===t.id?'#F7F5F0':'#78716C',fontSize:13,cursor:'pointer',textAlign:'left',fontFamily:"'DM Sans',sans-serif"}},t.l))
+      ),
+      // MRR
+      React.createElement('div',{style:{padding:'16px 18px',borderTop:'1px solid rgba(255,255,255,0.06)',borderBottom:'1px solid rgba(255,255,255,0.06)',marginBottom:8}},
+        React.createElement('div',{style:{fontSize:10,color:'#57534E',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:4}},'MRR Atual'),
+        React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:21,color:'#A67C52',fontWeight:600}},brl(mrr))
+      ),
+      // Backup buttons
+      React.createElement('div',{style:{padding:'12px 18px',display:'flex',flexDirection:'column',gap:6}},
+        React.createElement('button',{onClick:handleExport,style:{background:'transparent',color:'#57534E',border:'1px solid #2C2C2A',borderRadius:6,padding:'6px 10px',fontSize:11,cursor:'pointer',textAlign:'left',fontFamily:"'DM Sans',sans-serif"}},'↓ Exportar backup'),
+        React.createElement('label',{style:{background:'transparent',color:'#57534E',border:'1px solid #2C2C2A',borderRadius:6,padding:'6px 10px',fontSize:11,cursor:'pointer',display:'block'}},
+          '↑ Importar backup',
+          React.createElement('input',{type:'file',accept:'.json',onChange:handleImport,style:{display:'none'}})
+        )
+      )
+    ),
+    // MAIN
+    React.createElement('main',{style:{flex:1,padding:'28px 32px',minWidth:0,overflowY:'auto'}},
+      React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}},
+        React.createElement('h1',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:600,color:'#1C1917',margin:0}},TAB_NAMES[tab]),
+        React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+          React.createElement('button',{onClick:()=>setAno(a=>a-1),style:S.sec},'‹'),
+          React.createElement('span',{style:{fontSize:14,fontWeight:500,color:'#1C1917',minWidth:44,textAlign:'center'}},ano),
+          React.createElement('button',{onClick:()=>setAno(a=>a+1),style:S.sec},'›')
+        )
+      ),
+      tab==='dashboard'&&React.createElement(Dashboard,{fluxo,mrr,fma,totalPrev,porServico}),
+      tab==='contratos'&&React.createElement(Contratos,{data,upd}),
+      tab==='despesas'&&React.createElement(Despesas,{data,upd}),
+      tab==='fluxo'&&React.createElement(FluxoCaixa,{fluxo,data,upd}),
+      tab==='metricas'&&React.createElement(Metricas,{data,fluxo,mrr,ano})
+    )
+  );
+}
+
+ReactDOM.render(React.createElement(App), document.getElementById('root'));
+</script>
+</body>
+</html>
