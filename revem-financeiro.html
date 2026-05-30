@@ -117,6 +117,7 @@ const empty = () => ({
   ],
   cats: CATS_DEFAULT,
   metas: { anual:0, trimestres:[0,0,0,0] },
+  capacidade: { maxGestao:6, maxOperarte:3 },
   cartoes: [{id:'c6', nome:'C6 Profissional', fechamento:4, vencimento:10, limite:4000, cor:'#1C1917'}],
   comprasCartao: [], // [{id, cartaoId, descricao, valorTotal, numParcelas, valorParcela, mesInicio}]
   faturasPagas: {}, // { 'cartaoId_YYYY-MM': { pago:true, valor:number } }
@@ -145,6 +146,7 @@ const loadFromFB = () => db.ref(DB_REF).get().then(s => {
   if(!d.produtos) d.produtos = empty().produtos;
   if(!d.cats) d.cats = CATS_DEFAULT;
   if(!d.metas) d.metas = { anual:0, trimestres:[0,0,0,0] };
+  if(!d.capacidade) d.capacidade = {maxGestao:6, maxOperarte:3};
   if(!d.cartoes) d.cartoes = empty().cartoes;
   if(!d.faturasPagas) d.faturasPagas = {};
   if(!d.comprasCartao) d.comprasCartao = [];
@@ -1417,6 +1419,341 @@ function PainelCaixa({data,upd,fluxo}){
 }
 
 
+// ── DRE HELPERS ───────────────────────────────────────────────────────────────
+const calcDRE = (data, fluxo, ano) => {
+  const cats = data.cats || CATS_DEFAULT;
+  const getCatTipo = (catId) => {
+    if(!catId) return 'outro';
+    if(catId==='cac') return 'cac';
+    if(catId==='cos') return 'cos';
+    if(catId==='imp') return 'imposto';
+    if(catId==='socio') return 'socio';
+    return 'op'; // backoffice e outros = operacional
+  };
+
+  return fluxo.map(m => {
+    const rec = m.rec; // receita recebida
+    const prev = m.prev;
+
+    // Despesas pagas por categoria
+    let cos=0, cac=0, op=0, imp=0, socio=0, outros=0;
+    (data.despesas||[]).forEach(d => {
+      const entries = gExp(d).filter(e=>e.mes===m.mes);
+      if(!entries.length) return;
+      const k = `${d.id}_${m.mes}`;
+      const pago = (data.despReal||{})[k]?.ok;
+      if(!pago) return;
+      const val = (data.despReal||{})[k]?.valor ?? entries[0].valor;
+      const tipo = getCatTipo(d.catId);
+      if(tipo==='cos') cos+=val;
+      else if(tipo==='cac') cac+=val;
+      else if(tipo==='imposto') imp+=val;
+      else if(tipo==='socio') socio+=val;
+      else op+=val;
+    });
+
+    const margemBruta = rec - cos;
+    const resultado = rec - cos - cac - op - imp - socio;
+    const pctMargem = rec>0 ? (margemBruta/rec*100) : 0;
+    const pctResultado = rec>0 ? (resultado/rec*100) : 0;
+
+    return { ...m, cos, cac, op, imp, socio, margemBruta, resultado, pctMargem, pctResultado };
+  });
+};
+
+// ── PAINEL DRE ────────────────────────────────────────────────────────────────
+function PainelDRE({data, fluxo, ano}){
+  const dre = calcDRE(data, fluxo, ano);
+  const agora = mesNow();
+
+  // Totais do ano
+  const totRec = dre.reduce((s,m)=>s+m.rec,0);
+  const totCoS = dre.reduce((s,m)=>s+m.cos,0);
+  const totCAC = dre.reduce((s,m)=>s+m.cac,0);
+  const totOp  = dre.reduce((s,m)=>s+m.op,0);
+  const totImp = dre.reduce((s,m)=>s+m.imp,0);
+  const totSoc = dre.reduce((s,m)=>s+m.socio,0);
+  const totMargem = dre.reduce((s,m)=>s+m.margemBruta,0);
+  const totRes    = dre.reduce((s,m)=>s+m.resultado,0);
+  const pctMargem = totRec>0?(totMargem/totRec*100).toFixed(1):0;
+  const pctRes    = totRec>0?(totRes/totRec*100).toFixed(1):0;
+
+  // Ponto de equilíbrio
+  const despFixaMensal = (data.despesas||[]).filter(d=>d.ativo&&d.recorrente).reduce((s,d)=>s+d.valor,0);
+  const ticketMedioGestao = (()=>{
+    const gs=(data.contratos||[]).filter(c=>c.status==='ativo'&&c.recorrente);
+    return gs.length>0?gs.reduce((s,c)=>s+c.valorMensal,0)/gs.length:0;
+  })();
+  const pe = despFixaMensal;
+  const clientesPE = ticketMedioGestao>0?Math.ceil(pe/ticketMedioGestao):0;
+
+  const DRERow=({label,valor,pct,bold,indent,positivo,negativo,destaque})=>React.createElement('div',{style:{
+    display:'flex',justifyContent:'space-between',alignItems:'center',
+    padding:'10px 0',borderBottom:'1px solid #F0EDE8',
+    paddingLeft:indent?20:0,
+    background:destaque?'#F7F5F0':'transparent',
+    borderRadius:destaque?4:0,
+  }},
+    React.createElement('span',{style:{fontSize:13,color:indent?'#78716C':'#1C1917',fontWeight:bold?600:400}},label),
+    React.createElement('div',{style:{display:'flex',gap:16,alignItems:'center'}},
+      pct!==undefined&&React.createElement('span',{style:{fontSize:12,color:'#A8A29E',minWidth:50,textAlign:'right'}},`${pct}%`),
+      React.createElement('span',{style:{
+        fontFamily:"'Cormorant Garamond',serif",fontSize:bold?20:16,fontWeight:bold?600:400,
+        color:destaque?(totRes>=0?'#065F46':'#DC2626'):negativo?'#92400E':positivo?'#065F46':'#1C1917',
+        minWidth:120,textAlign:'right'
+      }},brl(valor))
+    )
+  );
+
+  return React.createElement('div',null,
+    // Cards resumo
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:24}},
+      [
+        {l:'Receita do Ano',v:brl(totRec),s:'total recebido'},
+        {l:'Margem Bruta',v:`${pctMargem}%`,s:brl(totMargem)+' após CoS'},
+        {l:'Resultado',v:`${pctRes}%`,s:brl(totRes)+' após todas despesas'},
+        {l:'Ponto de Equilíbrio',v:brl(pe),s:clientesPE>0?`≈ ${clientesPE} clientes de Gestão`:'configure despesas fixas'},
+      ].map((c,i)=>React.createElement('div',{key:i,style:S.card},
+        React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8}},c.l),
+        React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:600,color:'#1C1917',lineHeight:1}},c.v),
+        React.createElement('div',{style:{fontSize:11,color:'#A8A29E',marginTop:6}},c.s)
+      ))
+    ),
+
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}},
+      // DRE estruturado
+      React.createElement('div',{style:S.card},
+        React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:16}},'Demonstração de Resultado – Acumulado do Ano'),
+        React.createElement(DRERow,{label:'Receita Bruta',valor:totRec,bold:true,positivo:true}),
+        React.createElement(DRERow,{label:'(–) Custos de Entrega (CoS)',valor:-totCoS,indent:true,negativo:totCoS>0,pct:totRec>0?Math.round(totCoS/totRec*100):0}),
+        React.createElement(DRERow,{label:'= Margem Bruta',valor:totMargem,bold:true,pct:pctMargem,positivo:totMargem>0}),
+        React.createElement('div',{style:{height:8}}),
+        React.createElement(DRERow,{label:'(–) Vendas e Marketing (CAC)',valor:-totCAC,indent:true,negativo:totCAC>0,pct:totRec>0?Math.round(totCAC/totRec*100):0}),
+        React.createElement(DRERow,{label:'(–) Backoffice e Operacional',valor:-totOp,indent:true,negativo:totOp>0,pct:totRec>0?Math.round(totOp/totRec*100):0}),
+        React.createElement(DRERow,{label:'(–) Impostos e Taxas',valor:-totImp,indent:true,negativo:totImp>0,pct:totRec>0?Math.round(totImp/totRec*100):0}),
+        React.createElement(DRERow,{label:'(–) Pró-labore e Sócios',valor:-totSoc,indent:true,negativo:totSoc>0,pct:totRec>0?Math.round(totSoc/totRec*100):0}),
+        React.createElement('div',{style:{height:8}}),
+        React.createElement('div',{style:{background:'#F7F5F0',borderRadius:8,padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          React.createElement('span',{style:{fontSize:14,fontWeight:600,color:'#1C1917'}},'= Resultado Operacional'),
+          React.createElement('div',{style:{textAlign:'right'}},
+            React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:26,fontWeight:600,color:totRes>=0?'#065F46':'#DC2626'}},brl(totRes)),
+            React.createElement('div',{style:{fontSize:12,color:'#A8A29E'}},`${pctRes}% da receita`)
+          )
+        )
+      ),
+
+      // DRE por mês
+      React.createElement('div',{style:S.card},
+        React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:16}},'Resultado por Mês'),
+        React.createElement('div',{style:{overflowY:'auto',maxHeight:420}},
+          dre.filter(m=>m.rec>0||m.resultado!==0).map(m=>React.createElement('div',{key:m.mes,style:{padding:'10px 0',borderBottom:'1px solid #F0EDE8'}},
+            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},
+              React.createElement('div',null,
+                React.createElement('div',{style:{fontSize:13,fontWeight:500,color:'#1C1917'}},m.nome+(m.mes===agora?' · atual':'')),
+                React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:2}},`Receita: ${brl(m.rec)}`)
+              ),
+              React.createElement('div',{style:{textAlign:'right'}},
+                React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:600,color:m.resultado>=0?'#065F46':'#DC2626'}},brl(m.resultado)),
+                React.createElement('div',{style:{fontSize:11,color:'#A8A29E'}},`margem ${m.pctResultado.toFixed(0)}%`)
+              )
+            ),
+            m.rec>0&&React.createElement('div',{style:{marginTop:6}},
+              React.createElement(Progress,{value:Math.max(0,m.resultado),max:m.rec,showLabel:false})
+            )
+          ))
+        )
+      )
+    ),
+
+    // Ponto de equilíbrio detalhado
+    React.createElement('div',{style:{...S.card,marginTop:16}},
+      React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:16}},'Ponto de Equilíbrio'),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:24}},
+        React.createElement('div',null,
+          React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginBottom:4}},'Despesas fixas mensais'),
+          React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:26,fontWeight:600,color:'#1C1917'}},brl(despFixaMensal)),
+          React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:4}},'soma de todas as despesas recorrentes cadastradas')
+        ),
+        React.createElement('div',null,
+          React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginBottom:4}},'Ticket médio – Gestão Révem'),
+          React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:26,fontWeight:600,color:'#1C1917'}},brl(ticketMedioGestao)),
+          React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:4}},'média dos contratos de gestão ativos')
+        ),
+        React.createElement('div',null,
+          React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginBottom:4}},'Clientes para cobrir os custos'),
+          React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:26,fontWeight:600,color:clientesPE>0?'#A67C52':'#A8A29E'}},clientesPE>0?`${clientesPE} clientes`:'–'),
+          React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:4}},'mínimo de Gestão para pagar as contas')
+        )
+      )
+    )
+  );
+}
+
+// ── PAINEL CAPACIDADE ─────────────────────────────────────────────────────────
+function PainelCapacidade({data, upd, ano}){
+  const cap = data.capacidade || {maxGestao:6, maxOperarte:3};
+  const [editCap, setEditCap] = useState(false);
+  const [formCap, setFormCap] = useState({maxGestao:String(cap.maxGestao), maxOperarte:String(cap.maxOperarte)});
+
+  const salvarCap = () => {
+    upd(p=>({...p,capacidade:{maxGestao:parseInt(formCap.maxGestao)||6,maxOperarte:parseInt(formCap.maxOperarte)||3}}));
+    setEditCap(false);
+  };
+
+  // Calcula ocupação mês a mês
+  const meses = mesAno(ano);
+  const ocupacao = meses.map(mes => {
+    const gestoes = (data.contratos||[]).filter(c=>
+      c.status==='ativo' && c.recorrente &&
+      c.mesInicio<=mes && (!c.mesCancel||c.mesCancel>=mes) &&
+      (c.servico==='Gestão Révem'||c.servico==='Atendimento')
+    ).length;
+    const operartes = (data.contratos||[]).filter(c=>
+      c.status==='ativo' && !c.recorrente &&
+      gParcelas(c).some(p=>p.mes===mes)
+    ).length;
+    const recMes = (data.contratos||[]).reduce((s,c)=>{
+      const p=gParcelas(c).find(x=>x.mes===mes);
+      return s+(p?p.valor:0);
+    },0);
+    const pctGestao = cap.maxGestao>0?Math.round(gestoes/cap.maxGestao*100):0;
+    const pctOp = cap.maxOperarte>0?Math.round(operartes/cap.maxOperarte*100):0;
+    const pctTotal = Math.round((gestoes/cap.maxGestao + operartes/cap.maxOperarte)/2*100);
+    return { mes, nome:MC[midx(mes)], gestoes, operartes, recMes, pctGestao, pctOp, pctTotal };
+  });
+
+  const agora = mesNow();
+  const atual = ocupacao.find(m=>m.mes===agora)||{};
+
+  // LTV por cliente
+  const ltv = (()=>{
+    const map = {};
+    (data.contratos||[]).forEach(c=>{
+      if(!map[c.cliente]) map[c.cliente]={cliente:c.cliente, total:0, meses:0, contratos:[]};
+      const ps = gParcelas(c);
+      // só parcelas com recebimento confirmado
+      ps.forEach(p=>{
+        const k=`${c.id}_${p.mes}`;
+        if((data.conf||{})[k]?.ok){
+          map[c.cliente].total += (data.conf||{})[k].valor ?? p.valor;
+          map[c.cliente].meses++;
+        }
+      });
+      map[c.cliente].contratos.push(c.servico);
+    });
+    return Object.values(map).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
+  })();
+
+  return React.createElement('div',null,
+    // Config de capacidade
+    React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}},
+      React.createElement('div',{style:{display:'flex',gap:24}},
+        React.createElement('div',null,
+          React.createElement('span',{style:{fontSize:13,color:'#78716C'}},'Máximo Gestão: '),
+          React.createElement('strong',{style:{color:'#1C1917'}},cap.maxGestao,' clientes')
+        ),
+        React.createElement('div',null,
+          React.createElement('span',{style:{fontSize:13,color:'#78716C'}},'Máximo Operarte: '),
+          React.createElement('strong',{style:{color:'#1C1917'}},cap.maxOperarte,' simultâneos')
+        )
+      ),
+      React.createElement('button',{onClick:()=>setEditCap(!editCap),style:S.sec},'Editar limites')
+    ),
+
+    editCap&&React.createElement('div',{style:{...S.formBox,marginBottom:20}},
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}},
+        React.createElement(FLD,{label:'Máximo clientes de Gestão'},React.createElement('input',{style:S.inp,type:'number',value:formCap.maxGestao,onChange:e=>setFormCap(p=>({...p,maxGestao:e.target.value}))})),
+        React.createElement(FLD,{label:'Máximo Operartes simultâneos'},React.createElement('input',{style:S.inp,type:'number',value:formCap.maxOperarte,onChange:e=>setFormCap(p=>({...p,maxOperarte:e.target.value}))}))
+      ),
+      React.createElement('div',{style:{display:'flex',gap:10,justifyContent:'flex-end'}},
+        React.createElement('button',{onClick:()=>setEditCap(false),style:S.sec},'Cancelar'),
+        React.createElement('button',{onClick:salvarCap,style:S.prim},'Salvar')
+      )
+    ),
+
+    // Cards mês atual
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:20}},
+      [
+        {l:'Gestões Ativas',v:`${atual.gestoes||0} / ${cap.maxGestao}`,s:`${atual.pctGestao||0}% da capacidade`,warn:(atual.pctGestao||0)>=100},
+        {l:'Operartes Ativos',v:`${atual.operartes||0} / ${cap.maxOperarte}`,s:`${atual.pctOp||0}% da capacidade`,warn:(atual.pctOp||0)>=100},
+        {l:'Capacidade Geral',v:`${atual.pctTotal||0}%`,s:'média ponderada dos dois'},
+        {l:'Receita Prevista',v:brl(atual.recMes||0),s:'mês atual'},
+      ].map((c,i)=>React.createElement('div',{key:i,style:{...S.card,borderColor:c.warn?'#FCD34D':'#E7E5E0'}},
+        React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8}},c.l),
+        React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:600,color:c.warn?'#B45309':'#1C1917',lineHeight:1}},c.v),
+        React.createElement('div',{style:{fontSize:11,color:'#A8A29E',marginTop:6}},c.s)
+      ))
+    ),
+
+    // Histórico de capacidade mês a mês
+    React.createElement('div',{style:{...S.card,marginBottom:16}},
+      React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:16}},'Ocupação Mês a Mês'),
+      React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
+        React.createElement('thead',null,
+          React.createElement('tr',null,
+            ['Mês','Gestões','% Cap.','Operartes','% Cap.','Receita Prevista','Ocupação Geral'].map((h,i)=>React.createElement('th',{key:i,style:S.th},h))
+          )
+        ),
+        React.createElement('tbody',null,
+          ocupacao.map(m=>React.createElement('tr',{key:m.mes,style:{borderTop:'1px solid #F0EDE8',background:m.mes===agora?'#FDFBF7':'transparent'}},
+            React.createElement('td',{style:{...S.td,fontWeight:m.mes===agora?500:400}},m.nome,m.mes===agora&&React.createElement('span',{style:{fontSize:10,color:'#A67C52',marginLeft:6}},'atual')),
+            React.createElement('td',{style:S.td},
+              React.createElement('span',{style:{fontWeight:500,color:m.gestoes>=cap.maxGestao?'#B45309':'#1C1917'}},m.gestoes),
+              React.createElement('span',{style:{color:'#A8A29E'}},` / ${cap.maxGestao}`)
+            ),
+            React.createElement('td',{style:S.td},
+              React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},
+                React.createElement('div',{style:{width:60,height:5,background:'#F0EDE8',borderRadius:3,overflow:'hidden'}},
+                  React.createElement('div',{style:{height:'100%',width:`${m.pctGestao}%`,background:m.pctGestao>=100?'#B45309':'#A67C52',borderRadius:3}})
+                ),
+                React.createElement('span',{style:{fontSize:12,color:'#78716C'}},`${m.pctGestao}%`)
+              )
+            ),
+            React.createElement('td',{style:S.td},
+              React.createElement('span',{style:{fontWeight:500,color:m.operartes>=cap.maxOperarte?'#B45309':'#1C1917'}},m.operartes),
+              React.createElement('span',{style:{color:'#A8A29E'}},` / ${cap.maxOperarte}`)
+            ),
+            React.createElement('td',{style:S.td},
+              React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},
+                React.createElement('div',{style:{width:60,height:5,background:'#F0EDE8',borderRadius:3,overflow:'hidden'}},
+                  React.createElement('div',{style:{height:'100%',width:`${m.pctOp}%`,background:m.pctOp>=100?'#B45309':'#3B3A38',borderRadius:3}})
+                ),
+                React.createElement('span',{style:{fontSize:12,color:'#78716C'}},`${m.pctOp}%`)
+              )
+            ),
+            React.createElement('td',{style:{...S.td,fontFamily:"'Cormorant Garamond',serif",fontSize:16,fontWeight:600}},brl(m.recMes)),
+            React.createElement('td',{style:S.td},
+              React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},
+                React.createElement('div',{style:{width:80,height:5,background:'#F0EDE8',borderRadius:3,overflow:'hidden'}},
+                  React.createElement('div',{style:{height:'100%',width:`${Math.min(100,m.pctTotal)}%`,background:m.pctTotal>=90?'#B45309':m.pctTotal>=70?'#A67C52':'#78716C',borderRadius:3}})
+                ),
+                React.createElement('span',{style:{fontSize:12,fontWeight:500,color:m.pctTotal>=90?'#B45309':'#78716C'}},`${m.pctTotal}%`)
+              )
+            )
+          ))
+        )
+      )
+    ),
+
+    // LTV por cliente
+    ltv.length>0&&React.createElement('div',{style:S.card},
+      React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:16}},'LTV por Cliente – Total Recebido'),
+      ltv.map((c,i)=>React.createElement('div',{key:i,style:{display:'flex',alignItems:'center',gap:14,padding:'10px 0',borderBottom:'1px solid #F0EDE8'}},
+        React.createElement('div',{style:{width:22,height:22,borderRadius:'50%',background:'#F7F5F0',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:600,color:'#78716C',flexShrink:0}},i+1),
+        React.createElement('div',{style:{flex:1}},
+          React.createElement('div',{style:{fontSize:14,fontWeight:500,color:'#1C1917'}},c.cliente),
+          React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:2}},[...new Set(c.contratos)].join(', '))
+        ),
+        React.createElement('div',{style:{textAlign:'right'}},
+          React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:600,color:'#A67C52'}},brl(c.total)),
+          React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:2}},`${c.meses} recebimento${c.meses!==1?'s':''}`)
+        )
+      ))
+    )
+  );
+}
+
+
 // ── APP ───────────────────────────────────────────────────────────────────────
 function App(){
   const [authed,setAuthed]=useState(!!sessionStorage.getItem('revem_auth'));
@@ -1434,6 +1771,7 @@ function App(){
     d.produtos        = Array.isArray(d.produtos)        ? d.produtos        : empty().produtos;
     d.cats            = Array.isArray(d.cats)            ? d.cats            : CATS_DEFAULT;
     d.metas           = d.metas || {anual:0, trimestres:[0,0,0,0]};
+    d.capacidade      = d.capacidade || {maxGestao:6, maxOperarte:3};
     d.cartoes         = Array.isArray(d.cartoes)         ? d.cartoes         : empty().cartoes;
     d.faturasPagas    = (d.faturasPagas && typeof d.faturasPagas==='object') ? d.faturasPagas : {};
     d.comprasCartao   = Array.isArray(d.comprasCartao)   ? d.comprasCartao   : [];
@@ -1466,10 +1804,12 @@ function App(){
     {id:'caixa',l:'Caixa'},
     {id:'fluxo',l:'Fluxo de Caixa'},
     {id:'metas',l:'Metas'},
+    {id:'dre',l:'DRE'},
+    {id:'capacidade',l:'Capacidade'},
     {id:'metricas',l:'Métricas'},
     {id:'config',l:'Configurações'},
   ];
-  const TN={dashboard:'Dashboard',contratos:'Contratos',despesas:'Despesas',cartao:'Cartão C6',caixa:'Caixa e Patrimônio',fluxo:'Fluxo de Caixa',metas:'Metas',metricas:'Métricas',config:'Configurações'};
+  const TN={dashboard:'Dashboard',contratos:'Contratos',despesas:'Despesas',cartao:'Cartão C6',caixa:'Caixa e Patrimônio',fluxo:'Fluxo de Caixa',metas:'Metas',metricas:'Métricas',dre:'DRE – Resultado',capacidade:'Painel de Capacidade',config:'Configurações'};
 
   if(!authed) return React.createElement(Login,{onOk:()=>setAuthed(true)});
   if(status) return React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#F7F5F0',fontSize:14,color:'#78716C',fontFamily:"'DM Sans',sans-serif"}},status);
@@ -1523,6 +1863,8 @@ function App(){
       tab==='despesas'&&React.createElement(Despesas,{data,upd}),
       tab==='fluxo'&&React.createElement(FluxoCaixa,{fluxo,data,upd}),
       tab==='metas'&&React.createElement(Metas,{data,upd,fluxo,ano}),
+      tab==='dre'&&React.createElement(PainelDRE,{data,fluxo,ano}),
+      tab==='capacidade'&&React.createElement(PainelCapacidade,{data,upd,ano}),
       tab==='metricas'&&React.createElement(Metricas,{data,fluxo,mrr,ano}),
       tab==='cartao'&&React.createElement(PainelCartao,{data,upd}),
       tab==='caixa'&&React.createElement(PainelCaixa,{data,upd,fluxo}),
