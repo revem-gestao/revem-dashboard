@@ -128,6 +128,10 @@ const loadFromFB = () => db.ref(DB_REF).get().then(s => {
   const d = s.val();
   if(!d) return empty();
   // migrate: ensure new fields exist
+  if(!d.contratos) d.contratos = [];
+  if(!d.despesas) d.despesas = [];
+  if(!d.conf) d.conf = {};
+  if(!d.despReal) d.despReal = {};
   if(!d.produtos) d.produtos = empty().produtos;
   if(!d.cats) d.cats = CATS_DEFAULT;
   if(!d.metas) d.metas = { anual:0, trimestres:[0,0,0,0] };
@@ -165,7 +169,7 @@ const gExp = d => {
   while(m<=fim){ es.push({mes:m,valor:d.valor}); m=addM(m,1); }
   return d.mesFim?es.filter(e=>e.mes<=d.mesFim):es;
 };
-const buildFluxo = (contratos,despesas,conf,despReal,ano=ANO) =>
+const buildFluxo = (contratos=[],despesas=[],conf={},despReal={},ano=ANO) =>
   mesAno(ano).map(mes=>{
     let prev=0,rec=0,dPrev=0,dReal=0;
     contratos.forEach(c=>{ const p=gParcelas(c).find(x=>x.mes===mes); if(p){ prev+=p.valor; const k=`${c.id}_${mes}`; if(conf[k]?.ok) rec+=conf[k].valor??p.valor; } });
@@ -173,12 +177,12 @@ const buildFluxo = (contratos,despesas,conf,despReal,ano=ANO) =>
     return {mes,nome:MC[midx(mes)],prev,rec,dPrev,dReal,saldoPrev:prev-dPrev,saldoReal:rec-dReal};
   });
 
-const calcMRR = contratos => {
+const calcMRR = (contratos=[]) => {
   const m=mesNow();
   return contratos.filter(c=>c.recorrente&&c.status==='ativo'&&c.mesInicio<=m&&(!c.mesCancel||c.mesCancel>=m)).reduce((s,c)=>s+c.valorMensal,0);
 };
 
-const calcInadimplentes = (contratos, conf) => {
+const calcInadimplentes = (contratos=[], conf={}) => {
   const hoje = mesNow();
   const mAnterior = addM(hoje, -1);
   const result = [];
@@ -1097,7 +1101,7 @@ function App(){
 
   const upd=useCallback(fn=>setData(p=>{const next=fn(p);saveToFB(next);return next;}),[]);
 
-  const fluxo=useMemo(()=>data?buildFluxo(data.contratos,data.despesas,data.conf,data.despReal,ano):[],[data,ano]);
+  const fluxo=useMemo(()=>data?buildFluxo(data.contratos||[],data.despesas||[],data.conf||{},data.despReal||{},ano):[],[data,ano]);
   const mrr=useMemo(()=>data?calcMRR(data.contratos):0,[data]);
   const inadimplentes=useMemo(()=>data?calcInadimplentes(data.contratos,data.conf):[], [data]);
   const ma=mesNow();
