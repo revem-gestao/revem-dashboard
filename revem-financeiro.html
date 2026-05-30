@@ -110,13 +110,22 @@ const mesAno = (a=ANO) => Array.from({length:12},(_,i)=>`${a}-${String(i+1).padS
 
 const empty = () => ({
   contratos:[], despesas:[], conf:{}, despReal:{},
-  produtos:[ // produtos padrão
+  produtos:[
     {id:'gestao', nome:'Gestão Révem', tipo:'recorrente', preco:1300, descricao:'Gestão operacional mensal', ativo:true},
     {id:'operarte', nome:'Operarte', tipo:'projeto', preco:4000, descricao:'Programa de estruturação 13 semanas', ativo:true},
     {id:'olhar', nome:'Olhar Révem', tipo:'pontual', preco:0, descricao:'Leitura estratégica de dados', ativo:true},
   ],
   cats: CATS_DEFAULT,
-  metas: { anual: 0, trimestres:[0,0,0,0] }
+  metas: { anual:0, trimestres:[0,0,0,0] },
+  cartoes: [{id:'c6', nome:'C6 Profissional', fechamento:4, vencimento:10, limite:4000, cor:'#1C1917'}],
+  comprasCartao: [], // [{id, cartaoId, descricao, valorTotal, numParcelas, valorParcela, mesInicio}]
+  faturasPagas: {}, // { 'cartaoId_YYYY-MM': { pago:true, valor:number } }
+  contas: [
+    {id:'corrente', nome:'Conta Corrente', icone:'🏦', saldo:0},
+    {id:'reserva', nome:'Reserva de Emergência', icone:'🛡', saldo:0},
+    {id:'investimentos', nome:'Investimentos', icone:'📈', saldo:0},
+  ],
+  historicoContas: [] // [{data, contaId, saldo, obs}]
 });
 
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
@@ -136,6 +145,11 @@ const loadFromFB = () => db.ref(DB_REF).get().then(s => {
   if(!d.produtos) d.produtos = empty().produtos;
   if(!d.cats) d.cats = CATS_DEFAULT;
   if(!d.metas) d.metas = { anual:0, trimestres:[0,0,0,0] };
+  if(!d.cartoes) d.cartoes = empty().cartoes;
+  if(!d.faturasPagas) d.faturasPagas = {};
+  if(!d.comprasCartao) d.comprasCartao = [];
+  if(!d.contas) d.contas = empty().contas;
+  if(!d.historicoContas) d.historicoContas = [];
   return d;
 });
 
@@ -170,6 +184,55 @@ const gExp = d => {
   while(m<=fim){ es.push({mes:m,valor:d.valor}); m=addM(m,1); }
   return d.mesFim?es.filter(e=>e.mes<=d.mesFim):es;
 };
+// ── CARTÃO HELPERS ───────────────────────────────────────────────────────────
+// Dado uma despesa com cartão e a data, em qual mês fecha a fatura?
+const mesFaturaCartao = (mesDesp, diaFechamento) => {
+  // Se a despesa foi registrada antes do fechamento, entra na fatura do mesmo mês
+  // Se foi depois, entra na fatura do próximo mês
+  // Como registramos por mês (não por dia), usamos o mês da despesa direto
+  return mesDesp;
+};
+
+// Calcula o total de despesas de cartão por mês de fatura
+const calcFaturas = (despesas, cartoes, faturasPagas=[], comprasCartao=[]) => {
+  const faturas = {}; // { 'cartaoId_YYYY-MM': { total, itens, pago, valorPago, limite } }
+
+  const ensureFatura = (cartao, mes) => {
+    const key = `${cartao.id}_${mes}`;
+    if(!faturas[key]) faturas[key] = {cartao, mes, total:0, itens:[], pago:false, valorPago:0, limite:cartao.limite||0};
+    return key;
+  };
+
+  // Despesas recorrentes/avulsas no cartão
+  despesas.filter(d=>d.ativo&&d.formaPag==='Cartao').forEach(d=>{
+    const cartao = cartoes.find(c=>c.id===d.cartaoId);
+    if(!cartao) return;
+    gExp(d).forEach(e=>{
+      const key = ensureFatura(cartao, e.mes);
+      faturas[key].total += e.valor;
+      faturas[key].itens.push({descricao:d.descricao, valor:e.valor, tipo:'despesa', subcategoria:d.subcategoria||''});
+      const fp = faturasPagas[key];
+      if(fp?.pago){ faturas[key].pago=true; faturas[key].valorPago=fp.valor||faturas[key].total; }
+    });
+  });
+
+  // Compras parceladas
+  (comprasCartao||[]).forEach(c=>{
+    const cartao = cartoes.find(ct=>ct.id===c.cartaoId);
+    if(!cartao) return;
+    for(let i=0;i<c.numParcelas;i++){
+      const mes = addM(c.mesInicio, i);
+      const key = ensureFatura(cartao, mes);
+      faturas[key].total += c.valorParcela;
+      faturas[key].itens.push({descricao:`${c.descricao} (${i+1}/${c.numParcelas})`, valor:c.valorParcela, tipo:'parcela'});
+      const fp = faturasPagas[key];
+      if(fp?.pago){ faturas[key].pago=true; faturas[key].valorPago=fp.valor||faturas[key].total; }
+    }
+  });
+
+  return faturas;
+};
+
 const buildFluxo = (contratos=[],despesas=[],conf={},despReal={},ano=ANO) =>
   mesAno(ano).map(mes=>{
     let prev=0,rec=0,dPrev=0,dReal=0;
@@ -694,14 +757,30 @@ function Despesas({data,upd}){
           )
         )
       ),
-      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}},
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:14}},
+        React.createElement(FLD,{label:'Forma de Pagamento'},
+          React.createElement('select',{style:S.inp,value:form.formaPag||'Pix',onChange:e=>{set('formaPag',e.target.value);if(e.target.value!=='Cartao')set('cartaoId','');}},
+            React.createElement('option',{value:'Pix'},'Pix / Transferência'),
+            React.createElement('option',{value:'Cartao'},'Cartão de Crédito')
+          )
+        ),
+        form.formaPag==='Cartao'
+          ?React.createElement(FLD,{label:'Cartão'},
+              React.createElement('select',{style:S.inp,value:form.cartaoId||'',onChange:e=>set('cartaoId',e.target.value)},
+                React.createElement('option',{value:''},'Selecione...'),
+                (data.cartoes||[]).map(c=>React.createElement('option',{key:c.id,value:c.id},c.nome))
+              )
+            )
+          :React.createElement('div',null),
+        React.createElement(FLD,{label:'Mês de Início'},React.createElement('input',{style:S.inp,type:'month',value:form.mesInicio,onChange:e=>set('mesInicio',e.target.value)}))
+      ),
+      React.createElement('div',{style:{marginBottom:14}},
         React.createElement(FLD,{label:'Recorrência'},
           React.createElement('select',{style:S.inp,value:form.recorrente?'sim':'nao',onChange:e=>set('recorrente',e.target.value==='sim')},
             React.createElement('option',{value:'sim'},'Mensal – se repete todo mês'),
             React.createElement('option',{value:'nao'},'Uma vez só')
           )
-        ),
-        React.createElement(FLD,{label:'Mês de Início'},React.createElement('input',{style:S.inp,type:'month',value:form.mesInicio,onChange:e=>set('mesInicio',e.target.value)}))
+        )
       ),
       React.createElement('div',{style:{display:'flex',gap:10,justifyContent:'flex-end'}},
         React.createElement('button',{onClick:()=>setShow(false),style:S.sec},'Cancelar'),
@@ -722,7 +801,9 @@ function Despesas({data,upd}){
         itens.map(d=>React.createElement('div',{key:d.id,style:{...S.card,display:'flex',alignItems:'center',gap:12,marginBottom:5,padding:'11px 16px'}},
           React.createElement('div',{style:{flex:1,minWidth:0}},
             React.createElement('div',{style:{fontSize:13,color:'#1C1917'}},d.descricao),
-            d.subcategoria&&React.createElement('div',{style:{fontSize:11,color:'#A8A29E',marginTop:2}},d.subcategoria)
+            React.createElement('div',{style:{fontSize:11,color:'#A8A29E',marginTop:2}},
+              [d.subcategoria, d.formaPag==='Cartao'?'💳 Cartão':'Pix'].filter(Boolean).join(' · ')
+            )
           ),
           React.createElement('span',{style:{fontSize:12,color:'#A8A29E',marginRight:8}},d.recorrente?'mensal':`único · ${MC[midx(d.mesInicio)]}`),
           React.createElement('span',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:17,fontWeight:600,color:'#1C1917',flexShrink:0}},brl(d.valor)),
@@ -1090,6 +1171,252 @@ function Configuracoes({data,upd}){
   );
 }
 
+// ── PAINEL CARTÃO ─────────────────────────────────────────────────────────────
+function PainelCartao({data,upd}){
+  const cartoes = data.cartoes||[];
+  const faturas = calcFaturas(data.despesas||[], cartoes, data.faturasPagas||{}, data.comprasCartao||[]);
+  const agora = mesNow();
+  const [showCompra,setShowCompra]=useState(false);
+  const dfCompra=()=>({cartaoId:cartoes[0]?.id||'',descricao:'',valorTotal:'',numParcelas:1,valorParcela:'',mesInicio:mesNow()});
+  const [formC,setFormC]=useState(dfCompra());
+  const setC=(k,v)=>setFormC(p=>({...p,[k]:v}));
+
+  const pagarFatura=(key,valor)=>{
+    upd(p=>({...p,faturasPagas:{...p.faturasPagas,[key]:{pago:true,valor:parseFloat(valor)||0,data:new Date().toISOString()}}}));
+  };
+  const desfazerFatura=(key)=>{
+    upd(p=>{const fp={...p.faturasPagas};delete fp[key];return{...p,faturasPagas:fp};});
+  };
+  const salvarCompra=()=>{
+    if(!formC.descricao||!formC.valorTotal) return;
+    const vt=parseFloat(formC.valorTotal)||0;
+    const np=parseInt(formC.numParcelas)||1;
+    const c={...formC,id:gid(),valorTotal:vt,numParcelas:np,valorParcela:vt/np};
+    upd(p=>({...p,comprasCartao:[...(p.comprasCartao||[]),c]}));
+    setShowCompra(false);
+  };
+  const delCompra=id=>{ if(confirm('Excluir esta compra?')) upd(p=>({...p,comprasCartao:(p.comprasCartao||[]).filter(c=>c.id!==id)})); };
+
+  const faturasList = Object.entries(faturas).map(([k,v])=>({key:k,...v})).sort((a,b)=>b.mes.localeCompare(a.mes));
+  const faturaAtual = faturasList.filter(f=>f.mes===agora);
+  const faturasAnteriores = faturasList.filter(f=>f.mes<agora);
+
+  if(cartoes.length===0) return React.createElement(Empty,{msg:'Nenhum cartão cadastrado. Adicione em Configurações.'});
+
+  // Resumo de limite comprometido nos próximos meses
+  const proximosMeses = [agora, addM(agora,1), addM(agora,2)];
+  const comprometidoPorMes = proximosMeses.map(mes=>{
+    const total = faturasList.find(f=>f.mes===mes)?.total||0;
+    return {mes, nome:MC[midx(mes)], total};
+  });
+  const limite = cartoes[0]?.limite||0;
+
+  const FaturaCard=({f})=>{
+    const usoPct = limite>0?Math.min(100,Math.round(f.total/limite*100)):0;
+    return React.createElement('div',{style:{...S.card,marginBottom:10}},
+      React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}},
+        React.createElement('div',null,
+          React.createElement('div',{style:{display:'flex',alignItems:'center',gap:10,marginBottom:4}},
+            React.createElement('span',{style:{fontSize:14,fontWeight:500,color:'#1C1917'}},`${f.cartao.nome} – ${MC[midx(f.mes)]}/${f.mes.split('-')[0]}`),
+            f.pago&&React.createElement('span',{style:{fontSize:11,background:'#ECFDF5',color:'#065F46',padding:'2px 8px',borderRadius:12}},'✓ Paga')
+          ),
+          React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:28,fontWeight:600,color:f.pago?'#065F46':'#1C1917'}},brl(f.total)),
+          limite>0&&React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:2}},
+            `${usoPct}% do limite · disponível: ${brl(Math.max(0,limite-f.total))}`
+          )
+        ),
+        !f.pago&&f.mes<=agora
+          ?React.createElement('button',{onClick:()=>pagarFatura(f.key,f.total),style:{...S.prim,fontSize:12,padding:'6px 16px'}},'Confirmar pagamento')
+          :f.pago?React.createElement('button',{onClick:()=>desfazerFatura(f.key),style:{...S.sec,fontSize:12,padding:'4px 12px'}},'desfazer')
+          :React.createElement('span',{style:{fontSize:12,color:'#A8A29E'}},'Fatura futura')
+      ),
+      limite>0&&React.createElement('div',{style:{marginBottom:12}},
+        React.createElement(Progress,{value:f.total,max:limite,showLabel:false})
+      ),
+      f.itens.length>0&&React.createElement('div',{style:{borderTop:'1px solid #F0EDE8',paddingTop:10}},
+        f.itens.map((it,i)=>React.createElement('div',{key:i,style:{display:'flex',justifyContent:'space-between',fontSize:12,padding:'5px 0',borderBottom:'1px solid #F7F5F0'}},
+          React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6,color:'#78716C'}},
+            it.tipo==='parcela'&&React.createElement('span',{style:{fontSize:10,background:'#EEF2FF',color:'#4338CA',padding:'1px 6px',borderRadius:8}},'parcela'),
+            React.createElement('span',null,it.descricao)
+          ),
+          React.createElement('span',{style:{color:'#1C1917',fontWeight:500}},brl(it.valor))
+        ))
+      )
+    );
+  };
+
+  return React.createElement('div',null,
+    // Limite comprometido nos próximos meses
+    limite>0&&React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:20}},
+      comprometidoPorMes.map((m,i)=>React.createElement('div',{key:i,style:{...S.card,borderColor:m.total>limite*0.8?'#FCD34D':'#E7E5E0'}},
+        React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:6}},i===0?'Este mês':i===1?'Próximo mês':'Daqui 2 meses'),
+        React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:600,color:m.total>limite*0.8?'#B45309':'#1C1917'}},brl(m.total)),
+        React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginBottom:8}},`de ${brl(limite)} de limite`),
+        React.createElement(Progress,{value:m.total,max:limite,showLabel:false})
+      ))
+    ),
+
+    // Header com botão de compra parcelada
+    React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}},
+      React.createElement('div',null),
+      React.createElement('button',{onClick:()=>setShowCompra(!showCompra),style:S.prim},'+ Compra Parcelada')
+    ),
+
+    // Form compra parcelada
+    showCompra&&React.createElement('div',{style:{...S.formBox,marginBottom:20}},
+      React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:600,color:'#1C1917',marginBottom:18}},'Nova Compra Parcelada'),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:12,marginBottom:12}},
+        React.createElement(FLD,{label:'Descrição'},React.createElement('input',{style:S.inp,value:formC.descricao,onChange:e=>setC('descricao',e.target.value),placeholder:'Ex: Curso de gestão, iPhone, etc'})),
+        React.createElement(FLD,{label:'Cartão'},
+          React.createElement('select',{style:S.inp,value:formC.cartaoId,onChange:e=>setC('cartaoId',e.target.value)},
+            cartoes.map(c=>React.createElement('option',{key:c.id,value:c.id},c.nome))
+          )
+        )
+      ),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}},
+        React.createElement(FLD,{label:'Valor Total (R$)'},
+          React.createElement('input',{style:S.inp,type:'number',value:formC.valorTotal,
+            onChange:e=>{const v=parseFloat(e.target.value)||0;setFormC(p=>({...p,valorTotal:e.target.value,valorParcela:String((v/(p.numParcelas||1)).toFixed(2))}));},
+            placeholder:'0,00'})
+        ),
+        React.createElement(FLD,{label:'Número de Parcelas'},
+          React.createElement('input',{style:S.inp,type:'number',value:formC.numParcelas,min:1,
+            onChange:e=>{const n=parseInt(e.target.value)||1;setFormC(p=>({...p,numParcelas:n,valorParcela:String(((parseFloat(p.valorTotal)||0)/n).toFixed(2))}));}})
+        ),
+        React.createElement(FLD,{label:'Primeira Parcela'},
+          React.createElement('input',{style:S.inp,type:'month',value:formC.mesInicio,onChange:e=>setC('mesInicio',e.target.value)})
+        )
+      ),
+      parseFloat(formC.valorTotal)>0&&formC.numParcelas>1&&React.createElement('div',{style:{background:'#F7F5F0',borderRadius:8,padding:'10px 14px',fontSize:13,color:'#78716C',marginBottom:12}},
+        `→ ${formC.numParcelas}× de ${brl((parseFloat(formC.valorTotal)||0)/parseInt(formC.numParcelas||1))} · primeira em ${MC[midx(formC.mesInicio)]}/${formC.mesInicio.split('-')[0]}`
+      ),
+      React.createElement('div',{style:{display:'flex',gap:10,justifyContent:'flex-end'}},
+        React.createElement('button',{onClick:()=>setShowCompra(false),style:S.sec},'Cancelar'),
+        React.createElement('button',{onClick:salvarCompra,style:S.prim},'Salvar')
+      )
+    ),
+
+    // Compras parceladas ativas
+    (data.comprasCartao||[]).length>0&&React.createElement('div',{style:{marginBottom:20}},
+      React.createElement(GrpLbl,{label:'Compras Parceladas Ativas'}),
+      (data.comprasCartao||[]).map(c=>{
+        const ultimaMes=addM(c.mesInicio,c.numParcelas-1);
+        const parcelasPagas=(()=>{let count=0;for(let i=0;i<c.numParcelas;i++){const mes=addM(c.mesInicio,i);if(mes<agora)count++;}return count;})();
+        return React.createElement('div',{key:c.id,style:{...S.card,display:'flex',alignItems:'center',gap:14,marginBottom:6,padding:'12px 18px'}},
+          React.createElement('div',{style:{flex:1}},
+            React.createElement('div',{style:{fontSize:13,fontWeight:500,color:'#1C1917'}},c.descricao),
+            React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:2}},
+              `${c.numParcelas}× de ${brl(c.valorParcela)} · ${MC[midx(c.mesInicio)]} a ${MC[midx(ultimaMes)]}/${ultimaMes.split('-')[0]}`
+            )
+          ),
+          React.createElement('div',{style:{textAlign:'right',marginRight:8}},
+            React.createElement('div',{style:{fontSize:12,color:'#78716C'}},`${parcelasPagas}/${c.numParcelas} pagas`),
+            React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:16,color:'#1C1917',fontWeight:600}},brl(c.valorTotal))
+          ),
+          React.createElement('button',{onClick:()=>delCompra(c.id),style:{...S.sec,fontSize:12,padding:'4px 12px',color:'#B45309',flexShrink:0}},'×')
+        );
+      })
+    ),
+
+    // Faturas
+    faturaAtual.length>0&&React.createElement('div',{style:{marginBottom:20}},
+      React.createElement(GrpLbl,{label:'Fatura Atual'}),
+      faturaAtual.map(f=>React.createElement(FaturaCard,{key:f.key,f}))
+    ),
+    faturasAnteriores.length>0&&React.createElement('div',null,
+      React.createElement(GrpLbl,{label:'Faturas Anteriores'}),
+      faturasAnteriores.map(f=>React.createElement(FaturaCard,{key:f.key,f}))
+    ),
+    faturasList.length===0&&!showCompra&&React.createElement(Empty,{msg:'Nenhuma despesa ou compra no cartão ainda.'})
+  );
+}
+
+// ── PAINEL CAIXA ──────────────────────────────────────────────────────────────
+function PainelCaixa({data,upd,fluxo}){
+  const [editando,setEditando]=useState(null); // id da conta sendo editada
+  const [novoSaldo,setNovoSaldo]=useState('');
+  const [obs,setObs]=useState('');
+
+  const contas=data.contas||[];
+  const totalCaixa=contas.reduce((s,c)=>s+c.saldo,0);
+
+  const atualizarSaldo=(id)=>{
+    const saldo=parseFloat(novoSaldo)||0;
+    const hist={id:gid(),data:new Date().toISOString(),contaId:id,saldo,obs};
+    upd(p=>({
+      ...p,
+      contas:p.contas.map(c=>c.id===id?{...c,saldo}:c),
+      historicoContas:[...(p.historicoContas||[]),hist]
+    }));
+    setEditando(null); setNovoSaldo(''); setObs('');
+  };
+
+  // Receita e despesa do mês atual
+  const ma=mesNow();
+  const fma=fluxo.find(f=>f.mes===ma)||{};
+
+  return React.createElement('div',null,
+    // Total
+    React.createElement('div',{style:{...S.card,marginBottom:20,background:'#F7F5F0',border:'1px solid #E7E5E0'}},
+      React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8}},'Total em Caixa'),
+      React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:36,fontWeight:600,color:'#1C1917'}},brl(totalCaixa)),
+      React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:6}},`${contas.length} conta${contas.length!==1?'s':''} cadastrada${contas.length!==1?'s':''}`)
+    ),
+
+    // Contas
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:20}},
+      contas.map(c=>React.createElement('div',{key:c.id,style:S.card},
+        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}},
+          React.createElement('div',null,
+            React.createElement('div',{style:{fontSize:20,marginBottom:4}},c.icone),
+            React.createElement('div',{style:{fontSize:13,fontWeight:500,color:'#1C1917'}},c.nome)
+          ),
+          React.createElement('button',{onClick:()=>{setEditando(c.id);setNovoSaldo(String(c.saldo));setObs('');},style:{...S.sec,fontSize:12,padding:'3px 10px'}},'Atualizar')
+        ),
+        React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:26,fontWeight:600,color:'#1C1917'}},brl(c.saldo)),
+        editando===c.id&&React.createElement('div',{style:{marginTop:12,paddingTop:12,borderTop:'1px solid #F0EDE8'}},
+          React.createElement(FLD,{label:'Novo saldo (R$)'},React.createElement('input',{style:{...S.inp,marginBottom:8},type:'number',value:novoSaldo,onChange:e=>setNovoSaldo(e.target.value),placeholder:'0,00',autoFocus:true})),
+          React.createElement(FLD,{label:'Observação (opcional)'},React.createElement('input',{style:{...S.inp,marginBottom:10},value:obs,onChange:e=>setObs(e.target.value),placeholder:'Ex: após fatura C6'})),
+          React.createElement('div',{style:{display:'flex',gap:8}},
+            React.createElement('button',{onClick:()=>atualizarSaldo(c.id),style:{...S.prim,fontSize:12,padding:'5px 14px'}},'Salvar'),
+            React.createElement('button',{onClick:()=>setEditando(null),style:{...S.sec,fontSize:12,padding:'5px 12px'}},'Cancelar')
+          )
+        )
+      ))
+    ),
+
+    // Contexto do mês
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:20}},
+      React.createElement('div',{style:S.card},
+        React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8}},'Recebido este mês'),
+        React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:600,color:'#065F46'}},brl(fma.rec||0)),
+        React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:4}},`de ${brl(fma.prev||0)} previsto`)
+      ),
+      React.createElement('div',{style:S.card},
+        React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8}},'Despesas pagas este mês'),
+        React.createElement('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:600,color:'#92400E'}},brl(fma.dReal||0)),
+        React.createElement('div',{style:{fontSize:12,color:'#A8A29E',marginTop:4}},`de ${brl(fma.dPrev||0)} previsto`)
+      )
+    ),
+
+    // Histórico de atualizações
+    data.historicoContas?.length>0&&React.createElement('div',{style:S.card},
+      React.createElement('div',{style:{fontSize:11,color:'#78716C',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:14}},'Histórico de Atualizações'),
+      [...(data.historicoContas||[])].reverse().slice(0,10).map((h,i)=>{
+        const conta=contas.find(c=>c.id===h.contaId);
+        const d=new Date(h.data);
+        return React.createElement('div',{key:i,style:{display:'flex',alignItems:'center',gap:14,padding:'8px 0',borderBottom:'1px solid #F0EDE8',fontSize:13}},
+          React.createElement('span',{style:{color:'#A8A29E',fontSize:12,width:90,flexShrink:0}},`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`),
+          React.createElement('span',{style:{flex:1,color:'#78716C'}},conta?.nome||''),
+          h.obs&&React.createElement('span',{style:{fontSize:12,color:'#A8A29E',flex:1}},h.obs),
+          React.createElement('span',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:16,fontWeight:600,color:'#1C1917'}},brl(h.saldo))
+        );
+      })
+    )
+  );
+}
+
+
 // ── APP ───────────────────────────────────────────────────────────────────────
 function App(){
   const [authed,setAuthed]=useState(!!sessionStorage.getItem('revem_auth'));
@@ -1104,9 +1431,14 @@ function App(){
     d.despesas  = Array.isArray(d.despesas)  ? d.despesas  : [];
     d.conf      = (d.conf && typeof d.conf === 'object')      ? d.conf      : {};
     d.despReal  = (d.despReal && typeof d.despReal === 'object') ? d.despReal : {};
-    d.produtos  = Array.isArray(d.produtos)  ? d.produtos  : empty().produtos;
-    d.cats      = Array.isArray(d.cats)      ? d.cats      : CATS_DEFAULT;
-    d.metas     = d.metas || {anual:0, trimestres:[0,0,0,0]};
+    d.produtos        = Array.isArray(d.produtos)        ? d.produtos        : empty().produtos;
+    d.cats            = Array.isArray(d.cats)            ? d.cats            : CATS_DEFAULT;
+    d.metas           = d.metas || {anual:0, trimestres:[0,0,0,0]};
+    d.cartoes         = Array.isArray(d.cartoes)         ? d.cartoes         : empty().cartoes;
+    d.faturasPagas    = (d.faturasPagas && typeof d.faturasPagas==='object') ? d.faturasPagas : {};
+    d.comprasCartao   = Array.isArray(d.comprasCartao)   ? d.comprasCartao   : [];
+    d.contas          = Array.isArray(d.contas)          ? d.contas          : empty().contas;
+    d.historicoContas = Array.isArray(d.historicoContas) ? d.historicoContas : [];
     setData(d); setStatus('');
   }).catch(()=>setStatus('Erro ao conectar com Firebase. Verifique sua conexão.')); },[]);
 
@@ -1130,12 +1462,14 @@ function App(){
     {id:'dashboard',l:'Dashboard'},
     {id:'contratos',l:'Contratos'},
     {id:'despesas',l:'Despesas'},
+    {id:'cartao',l:'Cartão'},
+    {id:'caixa',l:'Caixa'},
     {id:'fluxo',l:'Fluxo de Caixa'},
     {id:'metas',l:'Metas'},
     {id:'metricas',l:'Métricas'},
     {id:'config',l:'Configurações'},
   ];
-  const TN={dashboard:'Dashboard',contratos:'Contratos',despesas:'Despesas',fluxo:'Fluxo de Caixa',metas:'Metas',metricas:'Métricas',config:'Configurações'};
+  const TN={dashboard:'Dashboard',contratos:'Contratos',despesas:'Despesas',cartao:'Cartão C6',caixa:'Caixa e Patrimônio',fluxo:'Fluxo de Caixa',metas:'Metas',metricas:'Métricas',config:'Configurações'};
 
   if(!authed) return React.createElement(Login,{onOk:()=>setAuthed(true)});
   if(status) return React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#F7F5F0',fontSize:14,color:'#78716C',fontFamily:"'DM Sans',sans-serif"}},status);
@@ -1190,6 +1524,8 @@ function App(){
       tab==='fluxo'&&React.createElement(FluxoCaixa,{fluxo,data,upd}),
       tab==='metas'&&React.createElement(Metas,{data,upd,fluxo,ano}),
       tab==='metricas'&&React.createElement(Metricas,{data,fluxo,mrr,ano}),
+      tab==='cartao'&&React.createElement(PainelCartao,{data,upd}),
+      tab==='caixa'&&React.createElement(PainelCaixa,{data,upd,fluxo}),
       tab==='config'&&React.createElement(Configuracoes,{data,upd})
     )
   );
