@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Révem — Calculadora de Capacidade</title>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --carvao:#323430;--terracota:#A0522D;--salvia:#A7B195;
+  --bege:#E7D7C7;--offwhite:#EEEBE5;--branco:#FDFBF8;--muted:#6B6860;
+  --ok-bg:#EEF4EB;--ok-bd:#C4D9BC;--ok-tx:#2A4A22;
+  --al-bg:#FDF3EC;--al-bd:#E8C4A8;--al-tx:#7A3A1A;
+}
+body{font-family:'Raleway',sans-serif;background:var(--offwhite);color:var(--carvao);min-height:100vh;display:flex;flex-direction:column}
+
+/* HEADER */
+.header{background:var(--branco);border-bottom:.5px solid var(--bege);padding:16px 32px;display:flex;align-items:baseline;gap:14px;flex-shrink:0}
+.h-logo{font-family:Georgia,serif;font-size:22px}
+.h-sep{color:var(--bege)}
+.h-titulo{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--terracota)}
+.h-right{margin-left:auto}
+.btn-pdf{padding:7px 14px;border:.5px solid var(--bege);border-radius:7px;background:transparent;color:var(--muted);font-family:'Raleway',sans-serif;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.04em;transition:all .15s}
+.btn-pdf:hover{border-color:var(--terracota);color:var(--terracota)}
+
+/* ID BAR */
+.id-bar{background:var(--branco);border-bottom:.5px solid var(--bege);padding:9px 32px;display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap}
+.id-lbl{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.id-input{padding:5px 10px;border:1.5px solid var(--bege);border-radius:7px;background:var(--offwhite);color:var(--carvao);font-family:'Raleway',sans-serif;font-size:13px;outline:none;transition:border .15s}
+.id-input:focus{border-color:var(--terracota)}
+#id-nome{width:200px}
+#id-mes{width:155px}
+.id-sep{width:.5px;height:16px;background:var(--bege)}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:1fr 390px;flex:1;min-height:0}
+.p-esq{padding:22px 32px;overflow-y:auto}
+.p-dir{background:var(--branco);border-left:.5px solid var(--bege);padding:22px 24px;position:sticky;top:0;height:calc(100vh - 96px);overflow-y:auto;display:flex;flex-direction:column}
+
+/* SECTIONS */
+.sec{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;padding-bottom:8px;border-bottom:.5px solid var(--bege);display:flex;align-items:center;gap:8px}
+.sec-n{background:var(--terracota);color:#fff;width:17px;height:17px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.sec-tag{background:var(--offwhite);border:.5px solid var(--bege);border-radius:10px;padding:1px 7px;font-size:9px;font-weight:400;text-transform:none;letter-spacing:.02em;color:var(--muted)}
+.bloco{background:var(--branco);border:.5px solid var(--bege);border-radius:12px;padding:16px 18px;margin-bottom:20px}
+
+/* FIELDS */
+.row{display:grid;gap:12px}
+.r2{grid-template-columns:1fr 1fr}
+.r3{grid-template-columns:1fr 1fr 1fr}
+.campo{display:flex;flex-direction:column;gap:5px}
+.flbl{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.fhint{font-size:10px;color:var(--muted);line-height:1.5}
+.fwrap{position:relative}
+.fi{width:100%;padding:9px 11px;border:1.5px solid var(--bege);border-radius:8px;background:var(--offwhite);color:var(--carvao);font-family:'Raleway',sans-serif;font-size:14px;outline:none;transition:border .15s;-moz-appearance:textfield}
+.fi::-webkit-outer-spin-button,.fi::-webkit-inner-spin-button{-webkit-appearance:none}
+.fi:focus{border-color:var(--terracota)}
+.fi.pfx{padding-left:28px}
+.fi.sfx{padding-right:24px}
+.fpfx{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted);pointer-events:none}
+.fsfx{position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--muted);pointer-events:none}
+
+/* SLIDER */
+.srow{display:flex;align-items:center;gap:8px;margin-top:4px}
+input[type=range]{flex:1;-webkit-appearance:none;height:3px;border-radius:2px;background:var(--bege);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--terracota);cursor:pointer}
+.sval{font-size:12px;font-weight:600;color:var(--terracota);min-width:30px;text-align:right}
+
+/* TIPOS */
+.th{display:grid;grid-template-columns:1.6fr 118px 106px 26px;gap:8px;padding:0 2px 8px;border-bottom:.5px solid var(--bege);margin-bottom:10px}
+.th span{font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.tr{display:grid;grid-template-columns:1.6fr 118px 106px 26px;gap:8px;margin-bottom:8px;align-items:center}
+.tnc{display:flex;align-items:center;gap:6px}
+.tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ti{width:100%;padding:7px 8px;border:1.5px solid var(--bege);border-radius:7px;background:var(--offwhite);color:var(--carvao);font-family:'Raleway',sans-serif;font-size:13px;outline:none;transition:border .15s;-moz-appearance:textfield}
+.ti::-webkit-outer-spin-button,.ti::-webkit-inner-spin-button{-webkit-appearance:none}
+.ti:focus{border-color:var(--terracota)}
+.ti.pfx{padding-left:22px}
+.thc{position:relative;display:flex;align-items:center}
+.thc .ti{padding-right:26px}
+.btn-ciclo{position:absolute;right:2px;width:22px;height:22px;border:none;background:var(--bege);border-radius:4px;color:var(--muted);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;font-family:Georgia,serif}
+.btn-ciclo:hover{background:var(--terracota);color:#fff}
+.btn-rm{width:26px;height:26px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-radius:5px;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.btn-rm:hover{background:#FCEAE8;color:#8B2A1E}
+.btn-add{margin-top:8px;padding:7px 12px;border:1.5px dashed var(--bege);border-radius:8px;background:transparent;color:var(--muted);font-family:'Raleway',sans-serif;font-size:11px;font-weight:600;cursor:pointer;width:100%;transition:all .15s;letter-spacing:.03em}
+.btn-add:hover{border-color:var(--terracota);color:var(--terracota);background:var(--al-bg)}
+
+/* RESULTS */
+.rt{font-family:Georgia,serif;font-size:15px;margin-bottom:2px}
+.rs{font-size:11px;color:var(--muted);margin-bottom:16px}
+.rd{background:var(--carvao);border-radius:12px;padding:18px;text-align:center;margin-bottom:12px}
+.rdl{font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:6px}
+.rdv{font-family:Georgia,serif;font-size:50px;color:#fff;line-height:1}
+.rdu{font-size:11px;color:rgba(255,255,255,.45);margin-top:5px}
+.rcards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.rcard{background:var(--offwhite);border:.5px solid var(--bege);border-radius:10px;padding:11px 12px}
+.rcl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.rcv{font-family:Georgia,serif;font-size:16px;color:var(--carvao)}
+.rcs{font-size:10px;color:var(--muted);margin-top:2px}
+.rb{background:var(--offwhite);border:.5px solid var(--bege);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.rbt{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+.rl{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;padding:4px 0;border-bottom:.5px solid var(--bege)}
+.rl:last-child{border-bottom:none}
+.rl small{font-size:10px;color:var(--muted)}
+.bt{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.bt:last-child{margin-bottom:0}
+.btn{font-size:11px;color:var(--carvao);width:66px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bw{flex:1;height:5px;background:var(--bege);border-radius:3px;overflow:hidden}
+.bf{height:100%;border-radius:3px;transition:width .4s}
+.bv{font-size:11px;font-weight:600;color:var(--carvao);min-width:18px;text-align:right}
+.rok{background:var(--ok-bg);border:.5px solid var(--ok-bd);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--ok-tx);line-height:1.65;margin-bottom:10px}
+.ral{background:var(--al-bg);border:.5px solid var(--al-bd);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--al-tx);line-height:1.65;margin-bottom:10px}
+.rvz{text-align:center;padding:36px 16px;color:var(--muted);font-size:13px;line-height:1.8;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.rvz-i{font-size:26px;margin-bottom:10px;opacity:.3;font-family:Georgia,serif}
+
+/* MODAL */
+.mov{display:none;position:fixed;inset:0;background:rgba(50,52,48,.5);z-index:100;align-items:center;justify-content:center;padding:16px}
+.mov.open{display:flex}
+.modal{background:var(--branco);border-radius:14px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+.mh{padding:18px 20px 14px;border-bottom:.5px solid var(--bege)}
+.mh-t{font-family:Georgia,serif;font-size:16px;margin-bottom:3px}
+.mh-s{font-size:11px;color:var(--muted)}
+.mb{padding:14px 20px}
+.er{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:.5px solid var(--bege)}
+.er:last-child{border-bottom:none}
+.en{font-size:12px;color:var(--carvao);flex:1}
+.ei{width:62px;padding:5px 7px;border:1.5px solid var(--bege);border-radius:6px;background:var(--offwhite);color:var(--carvao);font-family:'Raleway',sans-serif;font-size:13px;text-align:right;outline:none;transition:border .15s;-moz-appearance:textfield}
+.ei::-webkit-outer-spin-button,.ei::-webkit-inner-spin-button{-webkit-appearance:none}
+.ei:focus{border-color:var(--terracota)}
+.eu{font-size:11px;color:var(--muted);width:14px}
+.mt{padding:12px 20px;border-top:.5px solid var(--bege);display:flex;justify-content:space-between;align-items:center}
+.mt-l{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.mt-v{font-family:Georgia,serif;font-size:22px;color:var(--carvao)}
+.mf{padding:12px 20px;border-top:.5px solid var(--bege);display:flex;gap:8px;justify-content:flex-end}
+.btn-mc{padding:8px 14px;border:.5px solid var(--bege);border-radius:8px;background:transparent;color:var(--muted);font-family:'Raleway',sans-serif;font-size:12px;cursor:pointer;transition:all .15s}
+.btn-mc:hover{border-color:var(--carvao);color:var(--carvao)}
+.btn-mu{padding:8px 16px;border:none;border-radius:8px;background:var(--carvao);color:#fff;font-family:'Raleway',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn-mu:hover{opacity:.85}
+
+/* FOOTER */
+.rodape{padding:12px 32px;font-size:11px;color:var(--muted);border-top:.5px solid var(--bege);display:flex;justify-content:space-between;font-family:Georgia,serif;font-style:italic;background:var(--branco);flex-shrink:0}
+.rv-dot{width:5px;height:5px;border-radius:50%;background:var(--terracota);display:inline-block;margin-right:5px}
+
+/* PRINT DOC — hidden on screen */
+.print-doc{display:none}
+
+/* ===== PRINT ===== */
+@media print{
+  @page{margin:1.8cm 2cm;size:A4}
+  body{background:#fff}
+  .header,.id-bar,.layout,.rodape,.mov{display:none!important}
+  .print-doc{display:block;font-family:'Raleway',sans-serif;color:#323430;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pd-header{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:12pt;border-bottom:1pt solid #E7D7C7;margin-bottom:18pt}
+  .pd-logo{font-family:Georgia,serif;font-size:20pt;color:#323430}
+  .pd-subt{font-size:8pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#A0522D;margin-top:3pt}
+  .pd-dt{font-size:9pt;color:#6B6860;font-family:Georgia,serif;font-style:italic}
+  .pd-nome{font-family:Georgia,serif;font-size:17pt;color:#323430;margin-bottom:3pt}
+  .pd-mes{font-size:9pt;color:#6B6860;margin-bottom:18pt}
+  .pd-sec{font-size:7.5pt;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#6B6860;margin:13pt 0 7pt;padding-bottom:5pt;border-bottom:.5pt solid #E7D7C7}
+  .pd-resumo{background:#EEEBE5;border-radius:5pt;padding:9pt 11pt;font-size:9pt;color:#6B6860;line-height:1.75;margin-bottom:10pt}
+  .pd-resumo strong{color:#323430}
+  .pd-dest{background:#323430;border-radius:8pt;padding:16pt;text-align:center;margin-bottom:13pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pd-dl{font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:6pt}
+  .pd-dv{font-family:Georgia,serif;font-size:38pt;color:#fff;line-height:1}
+  .pd-du{font-size:9pt;color:rgba(255,255,255,.5);margin-top:4pt}
+  .pd-g2{display:grid;grid-template-columns:1fr 1fr;gap:9pt;margin-bottom:10pt}
+  .pd-card{border:.5pt solid #E7D7C7;border-radius:5pt;padding:9pt 11pt}
+  .pd-cl{font-size:7.5pt;color:#6B6860;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3pt}
+  .pd-cv{font-family:Georgia,serif;font-size:15pt;color:#323430}
+  .pd-cs{font-size:8pt;color:#6B6860;margin-top:2pt}
+  .pd-ln{display:flex;justify-content:space-between;font-size:10pt;padding:4pt 0;border-bottom:.5pt solid #E7D7C7}
+  .pd-ln:last-child{border-bottom:none}
+  .pd-ln small{font-size:8.5pt;color:#6B6860}
+  .pd-bt{display:flex;align-items:center;gap:7pt;margin-bottom:5pt}
+  .pd-bn{font-size:10pt;width:65pt;flex-shrink:0}
+  .pd-bw{flex:1;height:5pt;background:#E7D7C7;border-radius:2pt;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pd-bf{height:100%;border-radius:2pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pd-bv{font-size:10pt;font-weight:600;min-width:15pt;text-align:right}
+  .pd-ok{background:#EEF4EB;border:.5pt solid #C4D9BC;border-radius:5pt;padding:9pt 11pt;font-size:10pt;color:#2A4A22;line-height:1.6;margin-top:7pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pd-al{background:#FDF3EC;border:.5pt solid #E8C4A8;border-radius:5pt;padding:9pt 11pt;font-size:10pt;color:#7A3A1A;line-height:1.6;margin-top:7pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pd-rodape{margin-top:22pt;padding-top:9pt;border-top:.5pt solid #E7D7C7;display:flex;justify-content:space-between;font-family:Georgia,serif;font-style:italic;font-size:8.5pt;color:#6B6860}
+}
+
+/* RESPONSIVE */
+@media(max-width:820px){
+  .layout{grid-template-columns:1fr}
+  .p-dir{position:static;height:auto;border-left:none;border-top:.5px solid var(--bege)}
+  .r3{grid-template-columns:1fr 1fr}
+  .th,.tr{grid-template-columns:1.4fr 108px 100px 26px}
+}
+@media(max-width:480px){
+  .p-esq{padding:16px}
+  .r2,.r3{grid-template-columns:1fr}
+  .th,.tr{grid-template-columns:1.2fr 96px 94px 24px}
+  .header,.id-bar,.rodape{padding-left:16px;padding-right:16px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="h-logo">Révem</div>
+  <div class="h-sep">—</div>
+  <div class="h-titulo">Calculadora de Capacidade</div>
+  <div class="h-right">
+    <button class="btn-pdf" onclick="window.print()">↓ Exportar PDF</button>
+  </div>
+</div>
+
+<div class="id-bar">
+  <span class="id-lbl">Fotógrafa</span>
+  <input class="id-input" id="id-nome" type="text" placeholder="Nome da fotógrafa" oninput="calcular()">
+  <div class="id-sep"></div>
+  <span class="id-lbl">Mês</span>
+  <input class="id-input" id="id-mes" type="month" oninput="calcular()">
+</div>
+
+<div class="layout">
+
+  <div class="p-esq">
+
+    <div class="sec"><span class="sec-n">1</span> Disponibilidade</div>
+    <div class="bloco">
+      <div class="row r3">
+        <div class="campo">
+          <label class="flbl">Dias disponíveis / mês</label>
+          <div class="fwrap">
+            <input class="fi" type="number" id="dias" min="1" max="31" value="15" oninput="calcular()">
+          </div>
+        </div>
+        <div class="campo">
+          <label class="flbl">Horas de trabalho / dia</label>
+          <div class="fwrap">
+            <input class="fi sfx" type="number" id="horas-dia" min="1" max="16" step=".5" value="8" oninput="calcular()">
+            <span class="fsfx">h</span>
+          </div>
+        </div>
+        <div class="campo">
+          <label class="flbl">Margem de Respiro</label>
+          <div class="srow">
+            <input type="range" id="buffer" min="0" max="30" value="20" oninput="syncBuf()">
+            <span class="sval" id="buf-val">20%</span>
+          </div>
+          <div class="fhint">Cancels, reagendamentos, respiro</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec"><span class="sec-n">2</span> Tipos de trabalho</div>
+    <div class="bloco">
+      <div class="th">
+        <span>Tipo</span>
+        <span>Horas ciclo completo</span>
+        <span>Ticket médio</span>
+        <span></span>
+      </div>
+      <div id="tipos-lista"></div>
+      <button class="btn-add" onclick="addTipo()">+ Adicionar tipo</button>
+      <div class="fhint" style="margin-top:10px">
+        Horas do ciclo completo = atendimento + prep + deslocamento + sessão + seleção + edição + entrega + pós-venda.<br>
+        Clique em <strong>◎</strong> para calcular por etapa.
+      </div>
+    </div>
+
+    <div class="sec"><span class="sec-n">3</span> Meta financeira <span class="sec-tag">opcional</span></div>
+    <div class="bloco">
+      <div class="row r2">
+        <div class="campo">
+          <label class="flbl">Meta de faturamento mensal</label>
+          <div class="fwrap">
+            <span class="fpfx">R$</span>
+            <input class="fi pfx" type="number" id="meta" min="0" step="100" placeholder="0" oninput="calcular()">
+          </div>
+        </div>
+        <div class="campo">
+          <label class="flbl">Ticket médio geral <span style="font-weight:400;font-size:9px">(sobrescreve tipos)</span></label>
+          <div class="fwrap">
+            <span class="fpfx">R$</span>
+            <input class="fi pfx" type="number" id="ticket-geral" min="0" step="50" placeholder="Calculado dos tipos" oninput="calcular()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="p-dir">
+    <div class="rt">Resultado</div>
+    <div class="rs">Atualiza conforme você preenche</div>
+    <div id="resultado"></div>
+  </div>
+
+</div>
+
+<div class="print-doc" id="print-doc"></div>
+
+<div class="rodape">
+  <span><span class="rv-dot"></span>Révem Ateliê de Operação</span>
+  <span>Calculadora de Capacidade · Uso interno</span>
+</div>
+
+<!-- MODAL CICLO -->
+<div class="mov" id="mov" onclick="fechaBg(event)">
+  <div class="modal">
+    <div class="mh">
+      <div class="mh-t">Calcular horas do ciclo completo</div>
+      <div class="mh-s" id="modal-nome">Estimativa por etapa</div>
+    </div>
+    <div class="mb" id="modal-etapas"></div>
+    <div class="mt">
+      <span class="mt-l">Total estimado</span>
+      <span class="mt-v" id="modal-total">—</span>
+    </div>
+    <div class="mf">
+      <button class="btn-mc" onclick="fechaModal()">Cancelar</button>
+      <button class="btn-mu" onclick="usarTotal()">Usar este valor</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CORES=['#A0522D','#A7B195','#9BBFB8','#E7C87A','#B8A8D4','#D1DFE8','#C4917A','#888780'];
+const ETAPAS=[
+  {n:'Atendimento e alinhamento', v:.75},
+  {n:'Preparação e logística',    v:.5},
+  {n:'Deslocamento (ida + volta)',v:1},
+  {n:'Sessão fotográfica',        v:2},
+  {n:'Backup e organização',      v:.5},
+  {n:'Seleção de imagens',        v:1},
+  {n:'Edição',                    v:4},
+  {n:'Galeria e entrega',         v:.5},
+  {n:'Comunicação com a cliente', v:.5},
+  {n:'Ajustes e retrabalho',      v:.5},
+  {n:'Administrativo / financeiro',v:.25},
+  {n:'Pós-venda',                 v:.25},
+];
+
+let tipos=[
+  {id:1,nome:'Newborn',  horas:14,ticket:1400},
+  {id:2,nome:'Gestante', horas:10,ticket:900},
+  {id:3,nome:'Família',  horas:10,ticket:900},
+  {id:4,nome:'Infantil', horas:8, ticket:750},
+  {id:5,nome:'Evento',   horas:12,ticket:1600},
+];
+let nid=6, modalId=null;
+
+const cor=i=>CORES[i%CORES.length];
+const fmt=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
+const fmtH=h=>{const a=Math.round(h*4)/4;return a+'h';};
+const fmtMes=v=>{if(!v)return'';const[y,m]=v.split('-');return['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][+m-1]+' de '+y;};
+
+function renderTipos(){
+  document.getElementById('tipos-lista').innerHTML=tipos.map((t,i)=>`
+    <div class="tr">
+      <div class="tnc">
+        <div class="tdot" style="background:${cor(i)}"></div>
+        <input class="ti" type="text" value="${t.nome}" placeholder="Nome"
+          oninput="setT(${t.id},'nome',this.value)">
+      </div>
+      <div class="thc">
+        <input class="ti sfx" id="h-${t.id}" type="number" value="${t.horas}" min=".5" max="40" step=".5"
+          oninput="setT(${t.id},'horas',this.value)" style="padding-right:26px">
+        <button class="btn-ciclo" onclick="abreModal(${t.id})" title="Calcular por etapa">◎</button>
+      </div>
+      <div class="fwrap">
+        <span class="fpfx" style="font-size:11px;left:7px">R$</span>
+        <input class="ti pfx" type="number" value="${t.ticket}" min="0" step="50"
+          oninput="setT(${t.id},'ticket',this.value)">
+      </div>
+      <button class="btn-rm" onclick="rmT(${t.id})">×</button>
+    </div>`).join('');
+  calcular();
+}
+
+function setT(id,c,v){
+  const t=tipos.find(t=>t.id===id);if(!t)return;
+  if(c==='nome')t.nome=v;else t[c]=parseFloat(v)||0;
+  calcular();
+}
+function addTipo(){tipos.push({id:nid++,nome:'',horas:10,ticket:900});renderTipos();}
+function rmT(id){if(tipos.length<=1)return;tipos=tipos.filter(t=>t.id!==id);renderTipos();}
+
+function syncBuf(){
+  const v=document.getElementById('buffer').value;
+  document.getElementById('buf-val').textContent=v+'%';calcular();
+}
+
+/* MODAL */
+function abreModal(id){
+  modalId=id;
+  const t=tipos.find(t=>t.id===id);
+  document.getElementById('modal-nome').textContent=t?.nome||'Tipo';
+  document.getElementById('modal-etapas').innerHTML=ETAPAS.map((e,i)=>`
+    <div class="er">
+      <span class="en">${e.n}</span>
+      <input class="ei" id="e-${i}" type="number" value="${e.v}" min="0" max="20" step=".25" oninput="calcModal()">
+      <span class="eu">h</span>
+    </div>`).join('');
+  calcModal();
+  document.getElementById('mov').classList.add('open');
+}
+function fechaModal(){document.getElementById('mov').classList.remove('open');modalId=null;}
+function fechaBg(e){if(e.target.id==='mov')fechaModal();}
+function calcModal(){
+  let t=0;ETAPAS.forEach((_,i)=>{t+=parseFloat(document.getElementById('e-'+i)?.value)||0;});
+  document.getElementById('modal-total').textContent=fmtH(Math.round(t*4)/4);
+}
+function usarTotal(){
+  if(modalId===null)return;
+  let t=0;ETAPAS.forEach((_,i)=>{t+=parseFloat(document.getElementById('e-'+i)?.value)||0;});
+  t=Math.round(t*4)/4;
+  const tipo=tipos.find(t=>t.id===modalId);if(tipo)tipo.horas=t;
+  fechaModal();renderTipos();
+}
+
+/* MAIN CALC */
+function calcular(){
+  const dias=parseFloat(document.getElementById('dias').value)||0;
+  const hDia=parseFloat(document.getElementById('horas-dia').value)||0;
+  const buf=parseFloat(document.getElementById('buffer').value)||0;
+  const meta=parseFloat(document.getElementById('meta').value)||0;
+  const tG=parseFloat(document.getElementById('ticket-geral').value)||0;
+  const nome=document.getElementById('id-nome').value.trim();
+  const mes=document.getElementById('id-mes').value;
+
+  const tv=tipos.filter(t=>t.nome&&t.horas>0);
+  const el=document.getElementById('resultado');
+
+  if(!tv.length||!dias||!hDia){
+    el.innerHTML='<div class="rvz"><div class="rvz-i">◎</div>Preencha a disponibilidade e adicione ao menos um tipo de trabalho.</div>';
+    document.getElementById('print-doc').innerHTML='';return;
+  }
+
+  const hB=dias*hDia;
+  const hU=hB*(1-buf/100);
+  const caps=tv.map((t,i)=>({...t,i,max:Math.floor(hU/t.horas)}));
+  const maxA=Math.max(...caps.map(c=>c.max));
+  const minA=Math.min(...caps.map(c=>c.max));
+  const hMed=tv.reduce((s,t)=>s+t.horas,0)/tv.length;
+  const capR=Math.floor(hU/hMed);
+  const tMedT=tv.reduce((s,t)=>s+t.ticket,0)/tv.length;
+  const tM=tG>0?tG:tMedT;
+  const fatE=capR*tM;
+  const minF=meta>0?Math.ceil(meta/tM):null;
+
+  /* SCREEN */
+  let h='';
+  h+=`<div class="rd"><div class="rdl">Capacidade de referência</div><div class="rdv">${capR}</div><div class="rdu">trabalhos / mês · mix equilibrado</div></div>`;
+  h+=`<div class="rcards">
+    <div class="rcard"><div class="rcl">Horas úteis / mês</div><div class="rcv">${Math.round(hU)}h</div><div class="rcs">de ${Math.round(hB)}h brutas · margem de respiro ${buf}%</div></div>
+    <div class="rcard"><div class="rcl">Faturamento estimado</div><div class="rcv" style="font-size:14px">${fmt(fatE)}</div><div class="rcs">ticket médio ${fmt(tM)}</div></div>
+  </div>`;
+  h+=`<div class="rb"><div class="rbt">Amplitude da agenda</div>
+    <div class="rl"><span>Conservador <small>(só o tipo mais longo)</small></span><strong>${minA}</strong></div>
+    <div class="rl"><span>Mix equilibrado <small>(referência)</small></span><strong>${capR}</strong></div>
+    <div class="rl"><span>Máximo <small>(só o tipo mais curto)</small></span><strong>${maxA}</strong></div>
+  </div>`;
+  h+=`<div class="rb"><div class="rbt">Se a agenda fosse 100% de cada tipo</div>`;
+  caps.forEach(c=>{const p=maxA>0?Math.round(c.max/maxA*100):0;h+=`<div class="bt"><div class="btn">${c.nome}</div><div class="bw"><div class="bf" style="width:${p}%;background:${cor(c.i)}"></div></div><div class="bv">${c.max}</div></div>`;});
+  h+=`</div>`;
+  if(meta>0&&minF!==null){
+    h+=`<div class="rb"><div class="rbt">Meta financeira</div>
+      <div class="rl"><span>Meta mensal</span><strong>${fmt(meta)}</strong></div>
+      <div class="rl"><span>Mínimo necessário</span><strong>${minF} trabalhos</strong></div>
+      <div class="rl"><span>Capacidade disponível</span><strong>${capR} trabalhos</strong></div>
+    </div>`;
+    if(capR>=minF){const s=capR-minF;h+=`<div class="rok">✓ <strong>Meta alcançável.</strong> Com ${minF} trabalho${minF!==1?'s':''} você bate ${fmt(meta)}. Capacidade comporta até ${capR} — margem de ${s} slot${s!==1?'s':''}.</div>`;}
+    else{const d=minF-capR;h+=`<div class="ral">⚠ <strong>Modelo precisa de ajuste.</strong> A meta exige ${minF} trabalhos — ${d} além da capacidade de ${capR}. Caminhos: aumentar ticket, terceirizar edição ou revisar a meta.</div>`;}
+  }
+  el.innerHTML=h;
+
+  /* PRINT DOC */
+  const nd=nome||'Fotógrafa';
+  const md=mes?fmtMes(mes):'—';
+  const dh=new Date().toLocaleDateString('pt-BR');
+  const rt=tv.map(t=>`${t.nome} — ${fmtH(t.horas)} de ciclo · ${fmt(t.ticket)} ticket`).join('<br>');
+  let pb=caps.map(c=>{const p=maxA>0?Math.round(c.max/maxA*100):0;return`<div class="pd-bt"><div class="pd-bn">${c.nome}</div><div class="pd-bw"><div class="pd-bf" style="width:${p}%;background:${cor(c.i)}"></div></div><div class="pd-bv">${c.max}</div></div>`;}).join('');
+  let pm='';
+  if(meta>0&&minF!==null){
+    pm=`<div class="pd-sec">Meta financeira</div>
+    <div class="pd-ln"><span>Meta mensal</span><strong>${fmt(meta)}</strong></div>
+    <div class="pd-ln"><span>Mínimo necessário</span><strong>${minF} trabalhos</strong></div>
+    <div class="pd-ln"><span>Capacidade disponível (mix)</span><strong>${capR} trabalhos</strong></div>`;
+    if(capR>=minF){const s=capR-minF;pm+=`<div class="pd-ok">✓ <strong>Meta alcançável.</strong> Com ${minF} trabalho${minF!==1?'s':''} você bate ${fmt(meta)}. Margem de ${s} slot${s!==1?'s':''}.</div>`;}
+    else{const d=minF-capR;pm+=`<div class="pd-al">⚠ <strong>Modelo precisa de ajuste.</strong> A meta exige ${minF} trabalhos — ${d} além da capacidade de ${capR}. Caminhos: aumentar ticket, terceirizar edição ou revisar a meta.</div>`;}
+  }
+
+  document.getElementById('print-doc').innerHTML=`
+    <div class="pd-header"><div><div class="pd-logo">Révem</div><div class="pd-subt">Análise de Capacidade</div></div><div class="pd-dt">${dh}</div></div>
+    <div class="pd-nome">${nd}</div>
+    <div class="pd-mes">${md}</div>
+    <div class="pd-sec">Dados utilizados</div>
+    <div class="pd-resumo">
+      <strong>Disponibilidade:</strong> ${dias} dias/mês · ${fmtH(hDia)}/dia · margem de respiro ${buf}%<br>
+      <strong>Horas úteis:</strong> ${Math.round(hU)}h de ${Math.round(hB)}h brutas<br>
+      <strong>Tipos de trabalho:</strong><br>${rt}
+      ${meta>0?`<br><strong>Meta financeira:</strong> ${fmt(meta)}`:''}
+    </div>
+    <div class="pd-sec">Resultado</div>
+    <div class="pd-dest"><div class="pd-dl">Capacidade de referência · mix equilibrado</div><div class="pd-dv">${capR}</div><div class="pd-du">trabalhos / mês</div></div>
+    <div class="pd-g2">
+      <div class="pd-card"><div class="pd-cl">Horas úteis / mês</div><div class="pd-cv">${Math.round(hU)}h</div><div class="pd-cs">de ${Math.round(hB)}h brutas</div></div>
+      <div class="pd-card"><div class="pd-cl">Faturamento estimado</div><div class="pd-cv">${fmt(fatE)}</div><div class="pd-cs">ticket médio ${fmt(tM)}</div></div>
+    </div>
+    <div class="pd-sec">Amplitude da agenda</div>
+    <div class="pd-ln"><span>Cenário conservador <small>(só o tipo mais longo)</small></span><strong>${minA} trabalhos</strong></div>
+    <div class="pd-ln"><span>Mix equilibrado <small>(referência)</small></span><strong>${capR} trabalhos</strong></div>
+    <div class="pd-ln"><span>Cenário máximo <small>(só o tipo mais curto)</small></span><strong>${maxA} trabalhos</strong></div>
+    <div class="pd-sec">Se a agenda fosse 100% de cada tipo</div>
+    ${pb}
+    ${pm}
+    <div class="pd-rodape"><span>Révem Ateliê de Operação · Análise de Capacidade</span><span>Confidencial · ${dh}</span></div>`;
+}
+
+/* INIT */
+renderTipos();
+const hoje=new Date();
+document.getElementById('id-mes').value=`${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}`;
+calcular();
+</script>
+</body>
+</html>
